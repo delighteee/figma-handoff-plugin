@@ -252,6 +252,13 @@
         }
       }, "*");
     }
+
+     // Notify code.ts that the UI is ready
+window.onload = () => {
+  parent.postMessage({ pluginMessage: { type: "ready" } }, "*");
+};
   </script>
+
+ 
 </body>
 </html>

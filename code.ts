@@ -2,11 +2,9 @@
 
 figma.showUI(__html__, { width: 460, height: 600 });
 
-// --- Auto-detect from selected frame only ---
 async function getPageData() {
   const selection = figma.currentPage.selection;
 
-  // Must have exactly one frame selected
   if (selection.length === 0 || selection[0].type !== "FRAME") {
     figma.ui.postMessage({
       type: "prefill",
@@ -42,20 +40,15 @@ async function getPageData() {
 
   await walk(selectedFrame.children);
 
-  const interactions = componentNames.map(name => `Tap ${name} → `);
-
   figma.ui.postMessage({
     type: "prefill",
-    pageName: selectedFrame.name,   // use frame name, not page name
-    interactions,
+    pageName: selectedFrame.name,
+    interactions: componentNames.map(name => `Tap ${name} → `),
     componentNames,
     error: null,
   });
 }
 
-getPageData();
-
-// --- Handle create message from UI ---
 figma.ui.onmessage = async (msg: {
   type: string;
   componentName: string;
@@ -63,6 +56,12 @@ figma.ui.onmessage = async (msg: {
   interactions: string[];
   additionalInfo: string;
 }) => {
+  // UI is ready — now safe to detect and prefill
+  if (msg.type === "ready") {
+    await getPageData();
+    return;
+  }
+
   if (msg.type === "create-handoff") {
     await figma.loadFontAsync({ family: "Inter", style: "Regular" });
     await figma.loadFontAsync({ family: "Inter", style: "Bold" });
@@ -101,7 +100,6 @@ figma.ui.onmessage = async (msg: {
       return node;
     };
 
-    // --- Header ---
     const titleNode = addText(
       msg.componentName || "Component",
       26, true, { r: 0.08, g: 0.08, b: 0.12 },
