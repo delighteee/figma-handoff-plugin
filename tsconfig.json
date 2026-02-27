@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "lib": ["ES2016"],
+    "strict": true,
+    "typeRoots": [
+      "./node_modules/@figma/plugin-typings"
+    ]
+  }
+}

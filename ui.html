@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, sans-serif; }
+
+    body {
+      padding: 20px;
+      background: #f9f9fb;
+      color: #111;
+      font-size: 13px;
+    }
+
+    h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #111; }
+
+    .subtitle {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 16px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #e8f0fe;
+      color: #3460e0;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 20px;
+      margin-left: 6px;
+      vertical-align: middle;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #444;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      background: #fff;
+      color: #111;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: #4570f5;
+    }
+
+    input.prefilled { border-color: #a8c4ff; background: #f0f4ff; }
+
+    textarea { resize: vertical; min-height: 72px; }
+
+    .section { margin-bottom: 18px; }
+
+    .field-list { display: flex; flex-direction: column; gap: 6px; }
+
+    .field-row { display: flex; gap: 6px; align-items: center; }
+    .field-row input { flex: 1; margin: 0; }
+
+    .remove-btn {
+      background: none; border: none; cursor: pointer;
+      color: #aaa; font-size: 16px; padding: 0 4px; line-height: 1;
+    }
+    .remove-btn:hover { color: #e55; }
+
+    .add-btn {
+      background: none;
+      border: 1px dashed #bbb;
+      border-radius: 6px;
+      color: #888; font-size: 12px;
+      padding: 6px 10px; cursor: pointer;
+      margin-top: 4px; width: 100%;
+    }
+    .add-btn:hover { border-color: #4570f5; color: #4570f5; }
+
+    .create-btn {
+      width: 100%; padding: 11px;
+      background: #4570f5; color: white;
+      border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer; margin-top: 6px;
+    }
+    .create-btn:hover { background: #3460e0; }
+
+    .divider { border: none; border-top: 1px solid #e8e8ee; margin: 16px 0; }
+
+    .loading { color: #aaa; font-size: 12px; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <h2>🤝 Handoff Template <span class="badge" id="autobadge">Detecting…</span></h2>
+  <p class="subtitle">Fields marked in blue were auto-detected from the current page.</p>
+
+  <div class="section">
+    <label>Component / Page Name</label>
+    <input type="text" id="componentName" placeholder="Detecting page name…" />
+  </div>
+
+  <hr class="divider" />
+
+  <div class="section">
+    <label>⚡ API Calls</label>
+    <div class="field-list" id="apiList">
+      <div class="field-row">
+        <input type="text" placeholder="e.g. GET /api/user/:id" />
+        <button class="remove-btn" onclick="removeRow(this)">✕</button>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addRow('apiList', 'e.g. POST /api/comments')">+ Add API Call</button>
+  </div>
+
+  <div class="section">
+    <label>🖱 Interactions</label>
+    <div class="field-list" id="interactionList">
+      <p class="loading" id="interactionLoading">Scanning page for components…</p>
+    </div>
+    <button class="add-btn" onclick="addRow('interactionList', 'e.g. Hover card → show tooltip')">+ Add Interaction</button>
+  </div>
+
+  <div class="section">
+    <label>📋 Additional Information</label>
+    <textarea id="additionalInfo" placeholder="e.g. Uses skeleton loader while fetching. Requires auth token in header."></textarea>
+  </div>
+
+  <button class="create-btn" onclick="createHandoff()">Create Handoff Template</button>
+
+  <script>
+    // Listen for prefill data from code.ts
+   window.onmessage = (event) => {
+  const msg = event.data.pluginMessage;
+  if (!msg || msg.type !== "prefill") return;
+
+  // Show error if no valid frame was selected
+  if (msg.error) {
+    document.getElementById("componentName").placeholder = msg.error;
+    document.getElementById("componentName").style.borderColor = "#e55";
+    document.getElementById("interactionLoading").textContent = msg.error;
+    document.querySelector(".badge").textContent = "⚠ No frame selected";
+    document.querySelector(".badge").style.background = "#fff0f0";
+    document.querySelector(".badge").style.color = "#e55";
+    return;
+  }
+
+  // Prefill frame name
+  const nameInput = document.getElementById("componentName");
+  nameInput.value = msg.pageName || "";
+  if (msg.pageName) nameInput.classList.add("prefilled");
+
+  // Update badge
+  document.querySelector(".badge").textContent = `${(msg.componentNames || []).length} components found`;
+
+  // Prefill interactions
+  const list = document.getElementById("interactionList");
+  const loading = document.getElementById("interactionLoading");
+  if (loading) loading.remove();
+
+  if (msg.interactions && msg.interactions.length > 0) {
+    msg.interactions.forEach((text) => {
+      const row = document.createElement("div");
+      row.className = "field-row";
+      row.innerHTML = `
+        <input type="text" class="prefilled" value="${escapeHtml(text)}" />
+        <button class="remove-btn" onclick="removeRow(this)">✕</button>
+      `;
+      list.appendChild(row);
+    });
+  } else {
+    addRow("interactionList", "e.g. Click button → triggers action");
+  }
+};
+
+      // Prefill page name
+      const nameInput = document.getElementById("componentName");
+      nameInput.value = msg.pageName || "";
+      if (msg.pageName) nameInput.classList.add("prefilled");
+
+      // Update badge
+      const badge = document.getElementById("autobage") || document.getElementById("autobage");
+      document.getElementById("autobage") ?? (document.querySelector(".badge").textContent = "Auto-detected");
+
+      // Prefill interactions
+      const list = document.getElementById("interactionList");
+      const loading = document.getElementById("interactionLoading");
+      if (loading) loading.remove();
+
+      if (msg.interactions && msg.interactions.length > 0) {
+        msg.interactions.forEach((text, i) => {
+          const row = document.createElement("div");
+          row.className = "field-row";
+          row.innerHTML = `
+            <input type="text" class="prefilled" value="${escapeHtml(text)}" />
+            <button class="remove-btn" onclick="removeRow(this)">✕</button>
+          `;
+          list.appendChild(row);
+        });
+      } else {
+        // No components found — add one blank row
+        addRow("interactionList", "e.g. Click avatar → opens ProfileModal");
+      }
+
+      document.querySelector(".badge").textContent = `${(msg.componentNames || []).length} components found`;
+    };
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    function addRow(listId, placeholder) {
+      const list = document.getElementById(listId);
+      const row = document.createElement("div");
+      row.className = "field-row";
+      row.innerHTML = `
+        <input type="text" placeholder="${placeholder}" />
+        <button class="remove-btn" onclick="removeRow(this)">✕</button>
+      `;
+      list.appendChild(row);
+    }
+
+    function removeRow(btn) {
+      const row = btn.parentElement;
+      const list = row.parentElement;
+      if (list.querySelectorAll(".field-row").length > 1) row.remove();
+    }
+
+    function getListValues(listId) {
+      const inputs = document.querySelectorAll(`#${listId} input`);
+      return Array.from(inputs).map(i => i.value.trim());
+    }
+
+    function createHandoff() {
+      parent.postMessage({
+        pluginMessage: {
+          type: "create-handoff",
+          componentName: document.getElementById("componentName").value.trim(),
+          apiCalls: getListValues("apiList"),
+          interactions: getListValues("interactionList"),
+          additionalInfo: document.getElementById("additionalInfo").value.trim(),
+        }
+      }, "*");
+    }
+  </script>
+</body>
+</html>
