@@ -49,6 +49,11 @@ async function getPageData() {
   });
 }
 
+// Re-scan whenever selection changes in Figma
+figma.on("selectionchange", () => {
+  getPageData();
+});
+
 figma.ui.onmessage = async (msg: {
   type: string;
   componentName: string;
@@ -56,7 +61,7 @@ figma.ui.onmessage = async (msg: {
   interactions: string[];
   additionalInfo: string;
 }) => {
-  // UI is ready — now safe to detect and prefill
+  // UI is ready — run first scan
   if (msg.type === "ready") {
     await getPageData();
     return;

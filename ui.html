@@ -139,34 +139,40 @@
   <button class="create-btn" onclick="createHandoff()">Create Handoff Template</button>
 
   <script>
-    // Listen for prefill data from code.ts
-   window.onmessage = (event) => {
+  window.onload = () => {
+    parent.postMessage({ pluginMessage: { type: "ready" } }, "*");
+  };
+
+  window.onmessage = (event) => {
   const msg = event.data.pluginMessage;
   if (!msg || msg.type !== "prefill") return;
 
-  // Show error if no valid frame was selected
+  const badge = document.querySelector(".badge");
+  const nameInput = document.getElementById("componentName");
+  const list = document.getElementById("interactionList");
+
+  // Always reset interactions list before repopulating
+  list.innerHTML = "";
+
   if (msg.error) {
-    document.getElementById("componentName").placeholder = msg.error;
-    document.getElementById("componentName").style.borderColor = "#e55";
-    document.getElementById("interactionLoading").textContent = msg.error;
-    document.querySelector(".badge").textContent = "⚠ No frame selected";
-    document.querySelector(".badge").style.background = "#fff0f0";
-    document.querySelector(".badge").style.color = "#e55";
+    badge.textContent = "⚠ No frame selected";
+    badge.style.background = "#fff0f0";
+    badge.style.color = "#e55";
+    nameInput.value = "";
+    nameInput.placeholder = msg.error;
+    nameInput.style.borderColor = "#e55";
+    addRow("interactionList", "e.g. Click button → triggers action");
     return;
   }
 
-  // Prefill frame name
-  const nameInput = document.getElementById("componentName");
+  // Reset error styles
+  nameInput.style.borderColor = "";
+  nameInput.classList.add("prefilled");
   nameInput.value = msg.pageName || "";
-  if (msg.pageName) nameInput.classList.add("prefilled");
 
-  // Update badge
-  document.querySelector(".badge").textContent = `${(msg.componentNames || []).length} components found`;
-
-  // Prefill interactions
-  const list = document.getElementById("interactionList");
-  const loading = document.getElementById("interactionLoading");
-  if (loading) loading.remove();
+  badge.textContent = `${(msg.componentNames || []).length} components found`;
+  badge.style.background = "#e8f0fe";
+  badge.style.color = "#3460e0";
 
   if (msg.interactions && msg.interactions.length > 0) {
     msg.interactions.forEach((text) => {
@@ -183,81 +189,48 @@
   }
 };
 
-      // Prefill page name
-      const nameInput = document.getElementById("componentName");
-      nameInput.value = msg.pageName || "";
-      if (msg.pageName) nameInput.classList.add("prefilled");
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
 
-      // Update badge
-      const badge = document.getElementById("autobage") || document.getElementById("autobage");
-      document.getElementById("autobage") ?? (document.querySelector(".badge").textContent = "Auto-detected");
+  function addRow(listId, placeholder) {
+    const list = document.getElementById(listId);
+    const row = document.createElement("div");
+    row.className = "field-row";
+    row.innerHTML = `
+      <input type="text" placeholder="${placeholder}" />
+      <button class="remove-btn" onclick="removeRow(this)">✕</button>
+    `;
+    list.appendChild(row);
+  }
 
-      // Prefill interactions
-      const list = document.getElementById("interactionList");
-      const loading = document.getElementById("interactionLoading");
-      if (loading) loading.remove();
+  function removeRow(btn) {
+    const row = btn.parentElement;
+    const list = row.parentElement;
+    if (list.querySelectorAll(".field-row").length > 1) row.remove();
+  }
 
-      if (msg.interactions && msg.interactions.length > 0) {
-        msg.interactions.forEach((text, i) => {
-          const row = document.createElement("div");
-          row.className = "field-row";
-          row.innerHTML = `
-            <input type="text" class="prefilled" value="${escapeHtml(text)}" />
-            <button class="remove-btn" onclick="removeRow(this)">✕</button>
-          `;
-          list.appendChild(row);
-        });
-      } else {
-        // No components found — add one blank row
-        addRow("interactionList", "e.g. Click avatar → opens ProfileModal");
+  function getListValues(listId) {
+    const inputs = document.querySelectorAll(`#${listId} input`);
+    return Array.from(inputs).map(i => i.value.trim());
+  }
+
+  function createHandoff() {
+    parent.postMessage({
+      pluginMessage: {
+        type: "create-handoff",
+        componentName: document.getElementById("componentName").value.trim(),
+        apiCalls: getListValues("apiList"),
+        interactions: getListValues("interactionList"),
+        additionalInfo: document.getElementById("additionalInfo").value.trim(),
       }
-
-      document.querySelector(".badge").textContent = `${(msg.componentNames || []).length} components found`;
-    };
-
-    function escapeHtml(str) {
-      return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-    }
-
-    function addRow(listId, placeholder) {
-      const list = document.getElementById(listId);
-      const row = document.createElement("div");
-      row.className = "field-row";
-      row.innerHTML = `
-        <input type="text" placeholder="${placeholder}" />
-        <button class="remove-btn" onclick="removeRow(this)">✕</button>
-      `;
-      list.appendChild(row);
-    }
-
-    function removeRow(btn) {
-      const row = btn.parentElement;
-      const list = row.parentElement;
-      if (list.querySelectorAll(".field-row").length > 1) row.remove();
-    }
-
-    function getListValues(listId) {
-      const inputs = document.querySelectorAll(`#${listId} input`);
-      return Array.from(inputs).map(i => i.value.trim());
-    }
-
-    function createHandoff() {
-      parent.postMessage({
-        pluginMessage: {
-          type: "create-handoff",
-          componentName: document.getElementById("componentName").value.trim(),
-          apiCalls: getListValues("apiList"),
-          interactions: getListValues("interactionList"),
-          additionalInfo: document.getElementById("additionalInfo").value.trim(),
-        }
-      }, "*");
-    }
-
-     // Notify code.ts that the UI is ready
-window.onload = () => {
-  parent.postMessage({ pluginMessage: { type: "ready" } }, "*");
-};
-  </script>
+    }, "*");
+  }
+</script>
 
  
 </body>
