@@ -1,119 +1,126 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, sans-serif; }
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, sans-serif; }
 
-    body {
-      padding: 20px;
-      background: #f9f9fb;
-      color: #111;
-      font-size: 13px;
-    }
+  body { padding: 16px; background: #f9f9fb; color: #111; font-size: 13px; }
 
-    h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #111; }
+  h2 { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
 
-    .subtitle {
-      font-size: 11px;
-      color: #888;
-      margin-bottom: 16px;
-    }
+  .subtitle { font-size: 11px; color: #888; margin-bottom: 14px; }
 
-    .badge {
-      display: inline-block;
-      background: #e8f0fe;
-      color: #3460e0;
-      font-size: 10px;
-      font-weight: 600;
-      padding: 2px 7px;
-      border-radius: 20px;
-      margin-left: 6px;
-      vertical-align: middle;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
+  .badge {
+    display: inline-block; background: #e8f0fe; color: #3460e0;
+    font-size: 10px; font-weight: 600; padding: 2px 7px;
+    border-radius: 20px; margin-left: 6px; vertical-align: middle;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
 
-    label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 6px;
-      color: #444;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-    }
+  /* Accordion */
+  .accordion { border: 1px solid #e4e4ea; border-radius: 8px; margin-bottom: 8px; background: #fff; overflow: hidden; }
 
-    input[type="text"], textarea {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-size: 13px;
-      background: #fff;
-      color: #111;
-      margin-bottom: 6px;
-    }
+  .accordion-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 12px;
+    color: #333; user-select: none; background: #fff;
+  }
+  .accordion-header:hover { background: #f4f4f8; }
 
-    input[type="text"]:focus, textarea:focus {
-      outline: none;
-      border-color: #4570f5;
-    }
+  .accordion-arrow { font-size: 10px; color: #aaa; transition: transform 0.2s; }
+  .accordion.open .accordion-arrow { transform: rotate(180deg); }
 
-    input.prefilled { border-color: #a8c4ff; background: #f0f4ff; }
+  .accordion-body { display: none; padding: 12px 14px; border-top: 1px solid #eee; }
+  .accordion.open .accordion-body { display: block; }
 
-    textarea { resize: vertical; min-height: 72px; }
+  label {
+    display: block; font-weight: 600; margin-bottom: 5px;
+    color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+  }
 
-    .section { margin-bottom: 18px; }
+  input[type="text"], textarea, select {
+    width: 100%; padding: 7px 10px; border: 1px solid #ddd;
+    border-radius: 6px; font-size: 13px; background: #fff; color: #111; margin-bottom: 8px;
+  }
+  input[type="text"]:focus, textarea:focus, select:focus { outline: none; border-color: #4570f5; }
+  input.prefilled, textarea.prefilled { border-color: #a8c4ff; background: #f0f4ff; }
 
-    .field-list { display: flex; flex-direction: column; gap: 6px; }
+  textarea { resize: vertical; min-height: 60px; }
 
-    .field-row { display: flex; gap: 6px; align-items: center; }
-    .field-row input { flex: 1; margin: 0; }
+  .field-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 6px; }
+  .field-row { display: flex; gap: 5px; align-items: center; }
+  .field-row input { flex: 1; margin: 0; }
 
-    .remove-btn {
-      background: none; border: none; cursor: pointer;
-      color: #aaa; font-size: 16px; padding: 0 4px; line-height: 1;
-    }
-    .remove-btn:hover { color: #e55; }
+  .remove-btn { background: none; border: none; cursor: pointer; color: #bbb; font-size: 15px; padding: 0 3px; }
+  .remove-btn:hover { color: #e55; }
 
-    .add-btn {
-      background: none;
-      border: 1px dashed #bbb;
-      border-radius: 6px;
-      color: #888; font-size: 12px;
-      padding: 6px 10px; cursor: pointer;
-      margin-top: 4px; width: 100%;
-    }
-    .add-btn:hover { border-color: #4570f5; color: #4570f5; }
+  .add-btn {
+    background: none; border: 1px dashed #ccc; border-radius: 6px;
+    color: #999; font-size: 11px; padding: 5px 10px; cursor: pointer; width: 100%;
+  }
+  .add-btn:hover { border-color: #4570f5; color: #4570f5; }
 
-    .create-btn {
-      width: 100%; padding: 11px;
-      background: #4570f5; color: white;
-      border: none; border-radius: 8px;
-      font-size: 14px; font-weight: 600;
-      cursor: pointer; margin-top: 6px;
-    }
-    .create-btn:hover { background: #3460e0; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-    .divider { border: none; border-top: 1px solid #e8e8ee; margin: 16px 0; }
+  .create-btn {
+    width: 100%; padding: 12px; background: #4570f5; color: white;
+    border: none; border-radius: 8px; font-size: 14px; font-weight: 600;
+    cursor: pointer; margin-top: 10px; position: sticky; bottom: 0;
+  }
+  .create-btn:hover { background: #3460e0; }
 
-    .loading { color: #aaa; font-size: 12px; font-style: italic; }
-  </style>
+  .error-banner {
+    background: #fff0f0; border: 1px solid #ffcccc; border-radius: 6px;
+    padding: 10px 14px; color: #c00; font-size: 12px; margin-bottom: 12px; display: none;
+  }
+</style>
 </head>
 <body>
 
-  <h2>🤝 Handoff Template <span class="badge" id="autobadge">Detecting…</span></h2>
-  <p class="subtitle">Fields marked in blue were auto-detected from the current page.</p>
+<h2>🤝 Handoff Template <span class="badge" id="badge">Detecting…</span></h2>
+<p class="subtitle">Select a frame — fields auto-populate from your selection.</p>
 
-  <div class="section">
-    <label>Component / Page Name</label>
-    <input type="text" id="componentName" placeholder="Detecting page name…" />
+<div class="error-banner" id="errorBanner"></div>
+
+<!-- 1. Screen Identity -->
+<div class="accordion open" id="acc-identity">
+  <div class="accordion-header" onclick="toggleAcc('acc-identity')">
+    🖥 Screen Identity <span class="accordion-arrow">▼</span>
   </div>
+  <div class="accordion-body">
+    <label>Screen Name</label>
+    <input type="text" id="screenName" placeholder="e.g. User Profile" />
+    <div class="two-col">
+      <div>
+        <label>Screen Type</label>
+        <select id="screenType">
+          <option value="">Select type…</option>
+          <option>List</option>
+          <option>Detail</option>
+          <option>Modal</option>
+          <option>Bottom Sheet</option>
+          <option>Empty State</option>
+          <option>Error State</option>
+          <option>Onboarding</option>
+          <option>Form</option>
+          <option>Dashboard</option>
+        </select>
+      </div>
+      <div>
+        <label>Page / Section</label>
+        <input type="text" id="pageSection" placeholder="e.g. Onboarding" />
+      </div>
+    </div>
+  </div>
+</div>
 
-  <hr class="divider" />
-
-  <div class="section">
-    <label>⚡ API Calls</label>
+<!-- 2. API & Data -->
+<div class="accordion open" id="acc-api">
+  <div class="accordion-header" onclick="toggleAcc('acc-api')">
+    ⚡ API & Data <span class="accordion-arrow">▼</span>
+  </div>
+  <div class="accordion-body">
+    <label>API Calls</label>
     <div class="field-list" id="apiList">
       <div class="field-row">
         <input type="text" placeholder="e.g. GET /api/user/:id" />
@@ -121,80 +128,206 @@
       </div>
     </div>
     <button class="add-btn" onclick="addRow('apiList', 'e.g. POST /api/comments')">+ Add API Call</button>
-  </div>
 
-  <div class="section">
-    <label>🖱 Interactions</label>
-    <div class="field-list" id="interactionList">
-      <p class="loading" id="interactionLoading">Scanning page for components…</p>
+    <label style="margin-top:10px">Loading / Empty / Error States</label>
+    <div class="field-list" id="dataStateList">
+      <div class="field-row">
+        <input type="text" placeholder="e.g. Show skeleton while loading user data" />
+        <button class="remove-btn" onclick="removeRow(this)">✕</button>
+      </div>
     </div>
-    <button class="add-btn" onclick="addRow('interactionList', 'e.g. Hover card → show tooltip')">+ Add Interaction</button>
+    <button class="add-btn" onclick="addRow('dataStateList', 'e.g. Empty state if no results')">+ Add State</button>
   </div>
+</div>
 
-  <div class="section">
-    <label>📋 Additional Information</label>
-    <textarea id="additionalInfo" placeholder="e.g. Uses skeleton loader while fetching. Requires auth token in header."></textarea>
+<!-- 3. Interactions & Navigation -->
+<div class="accordion open" id="acc-interactions">
+  <div class="accordion-header" onclick="toggleAcc('acc-interactions')">
+    🖱 Interactions & Navigation <span class="accordion-arrow">▼</span>
   </div>
+  <div class="accordion-body">
+    <label>Interactions</label>
+    <div class="field-list" id="interactionList"></div>
+    <button class="add-btn" onclick="addRow('interactionList', 'e.g. Tap avatar → open ProfileModal')">+ Add Interaction</button>
 
-  <button class="create-btn" onclick="createHandoff()">Create Handoff Template</button>
+    <label style="margin-top:10px">Gestures</label>
+    <div class="field-list" id="gestureList">
+      <div class="field-row">
+        <input type="text" placeholder="e.g. Swipe left → delete item" />
+        <button class="remove-btn" onclick="removeRow(this)">✕</button>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addRow('gestureList', 'e.g. Pull to refresh')">+ Add Gesture</button>
+  </div>
+</div>
 
-  <script>
+<!-- 4. Component Notes -->
+<div class="accordion" id="acc-components">
+  <div class="accordion-header" onclick="toggleAcc('acc-components')">
+    🧩 Component Notes <span class="accordion-arrow">▼</span>
+  </div>
+  <div class="accordion-body">
+    <label>Notes on components used</label>
+    <div class="field-list" id="componentNoteList">
+      <div class="field-row">
+        <input type="text" placeholder="e.g. Button/Primary uses disabled state until form valid" />
+        <button class="remove-btn" onclick="removeRow(this)">✕</button>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addRow('componentNoteList', 'e.g. Card/Compact variant used here')">+ Add Note</button>
+  </div>
+</div>
+
+<!-- 5. States to Build -->
+<div class="accordion" id="acc-states">
+  <div class="accordion-header" onclick="toggleAcc('acc-states')">
+    🔀 States to Build <span class="accordion-arrow">▼</span>
+  </div>
+  <div class="accordion-body">
+    <div class="field-list" id="stateList">
+      <div class="field-row">
+        <input type="text" placeholder="e.g. Authenticated vs guest view" />
+        <button class="remove-btn" onclick="removeRow(this)">✕</button>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addRow('stateList', 'e.g. Admin vs regular user view')">+ Add State</button>
+  </div>
+</div>
+
+<!-- 6. Business Logic -->
+<div class="accordion" id="acc-logic">
+  <div class="accordion-header" onclick="toggleAcc('acc-logic')">
+    ⚙️ Business Logic <span class="accordion-arrow">▼</span>
+  </div>
+  <div class="accordion-body">
+    <div class="field-list" id="logicList">
+      <div class="field-row">
+        <input type="text" placeholder="e.g. Submit disabled until all fields valid" />
+        <button class="remove-btn" onclick="removeRow(this)">✕</button>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addRow('logicList', 'e.g. Hide price if user is admin')">+ Add Rule</button>
+  </div>
+</div>
+
+<!-- 7. Assets & Tokens -->
+<div class="accordion" id="acc-assets">
+  <div class="accordion-header" onclick="toggleAcc('acc-assets')">
+    🖼 Assets & Tokens <span class="accordion-arrow">▼</span>
+  </div>
+  <div class="accordion-body">
+    <div class="field-list" id="assetList">
+      <div class="field-row">
+        <input type="text" placeholder="e.g. Export hero-image@2x as PNG" />
+        <button class="remove-btn" onclick="removeRow(this)">✕</button>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addRow('assetList', 'e.g. Uses custom font: Sohne')">+ Add Asset</button>
+  </div>
+</div>
+
+<!-- 8. Accessibility -->
+<div class="accordion" id="acc-a11y">
+  <div class="accordion-header" onclick="toggleAcc('acc-a11y')">
+    ♿ Accessibility <span class="accordion-arrow">▼</span>
+  </div>
+  <div class="accordion-body">
+    <div class="field-list" id="a11yList">
+      <div class="field-row">
+        <input type="text" placeholder='e.g. Avatar alt text: "User profile photo"' />
+        <button class="remove-btn" onclick="removeRow(this)">✕</button>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addRow('a11yList', 'e.g. Tab order: Name → Email → Submit')">+ Add Note</button>
+  </div>
+</div>
+
+<!-- 9. Analytics -->
+<div class="accordion" id="acc-analytics">
+  <div class="accordion-header" onclick="toggleAcc('acc-analytics')">
+    📊 Analytics <span class="accordion-arrow">▼</span>
+  </div>
+  <div class="accordion-body">
+    <div class="field-list" id="analyticsList">
+      <div class="field-row">
+        <input type="text" placeholder="e.g. Track screen_view: profile_screen" />
+        <button class="remove-btn" onclick="removeRow(this)">✕</button>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addRow('analyticsList', 'e.g. Track cta_tap on primary button')">+ Add Event</button>
+  </div>
+</div>
+
+<!-- 10. Additional Info -->
+<div class="accordion" id="acc-additional">
+  <div class="accordion-header" onclick="toggleAcc('acc-additional')">
+    📋 Additional Information <span class="accordion-arrow">▼</span>
+  </div>
+  <div class="accordion-body">
+    <textarea id="additionalInfo" placeholder="Any extra context for developers…"></textarea>
+  </div>
+</div>
+
+<button class="create-btn" onclick="createHandoff()">Create Handoff Template</button>
+
+<script>
   window.onload = () => {
     parent.postMessage({ pluginMessage: { type: "ready" } }, "*");
   };
 
   window.onmessage = (event) => {
-  const msg = event.data.pluginMessage;
-  if (!msg || msg.type !== "prefill") return;
+    const msg = event.data.pluginMessage;
+    if (!msg || msg.type !== "prefill") return;
 
-  const badge = document.querySelector(".badge");
-  const nameInput = document.getElementById("componentName");
-  const list = document.getElementById("interactionList");
+    const badge = document.getElementById("badge");
+    const errorBanner = document.getElementById("errorBanner");
+    const list = document.getElementById("interactionList");
 
-  // Always reset interactions list before repopulating
-  list.innerHTML = "";
+    // Reset interactions
+    list.innerHTML = "";
 
-  if (msg.error) {
-    badge.textContent = "⚠ No frame selected";
-    badge.style.background = "#fff0f0";
-    badge.style.color = "#e55";
-    nameInput.value = "";
-    nameInput.placeholder = msg.error;
-    nameInput.style.borderColor = "#e55";
-    addRow("interactionList", "e.g. Click button → triggers action");
-    return;
+    if (msg.error) {
+      badge.textContent = "⚠ No frame selected";
+      badge.style.background = "#fff0f0";
+      badge.style.color = "#e55";
+      errorBanner.textContent = msg.error;
+      errorBanner.style.display = "block";
+      addRow("interactionList", "e.g. Tap button → triggers action");
+      return;
+    }
+
+    errorBanner.style.display = "none";
+    badge.style.background = "#e8f0fe";
+    badge.style.color = "#3460e0";
+    badge.textContent = `${(msg.componentNames || []).length} components found`;
+
+    // Prefill screen name
+    const nameInput = document.getElementById("screenName");
+    nameInput.value = msg.pageName || "";
+    nameInput.classList.add("prefilled");
+
+    // Prefill interactions
+    if (msg.interactions && msg.interactions.length > 0) {
+      msg.interactions.forEach((text) => {
+        const row = document.createElement("div");
+        row.className = "field-row";
+        row.innerHTML = `
+          <input type="text" class="prefilled" value="${escapeHtml(text)}" />
+          <button class="remove-btn" onclick="removeRow(this)">✕</button>
+        `;
+        list.appendChild(row);
+      });
+    } else {
+      addRow("interactionList", "e.g. Tap button → triggers action");
+    }
+  };
+
+  function toggleAcc(id) {
+    document.getElementById(id).classList.toggle("open");
   }
-
-  // Reset error styles
-  nameInput.style.borderColor = "";
-  nameInput.classList.add("prefilled");
-  nameInput.value = msg.pageName || "";
-
-  badge.textContent = `${(msg.componentNames || []).length} components found`;
-  badge.style.background = "#e8f0fe";
-  badge.style.color = "#3460e0";
-
-  if (msg.interactions && msg.interactions.length > 0) {
-    msg.interactions.forEach((text) => {
-      const row = document.createElement("div");
-      row.className = "field-row";
-      row.innerHTML = `
-        <input type="text" class="prefilled" value="${escapeHtml(text)}" />
-        <button class="remove-btn" onclick="removeRow(this)">✕</button>
-      `;
-      list.appendChild(row);
-    });
-  } else {
-    addRow("interactionList", "e.g. Click button → triggers action");
-  }
-};
 
   function escapeHtml(str) {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   }
 
   function addRow(listId, placeholder) {
@@ -215,23 +348,32 @@
   }
 
   function getListValues(listId) {
-    const inputs = document.querySelectorAll(`#${listId} input`);
-    return Array.from(inputs).map(i => i.value.trim());
+    return Array.from(document.querySelectorAll(`#${listId} input`))
+      .map(i => i.value.trim())
+      .filter(v => v !== "");
   }
 
   function createHandoff() {
     parent.postMessage({
       pluginMessage: {
         type: "create-handoff",
-        componentName: document.getElementById("componentName").value.trim(),
-        apiCalls: getListValues("apiList"),
-        interactions: getListValues("interactionList"),
+        screenName:     document.getElementById("screenName").value.trim(),
+        screenType:     document.getElementById("screenType").value,
+        pageSection:    document.getElementById("pageSection").value.trim(),
+        apiCalls:       getListValues("apiList"),
+        dataStates:     getListValues("dataStateList"),
+        interactions:   getListValues("interactionList"),
+        gestures:       getListValues("gestureList"),
+        componentNotes: getListValues("componentNoteList"),
+        statesToBuild:  getListValues("stateList"),
+        businessLogic:  getListValues("logicList"),
+        assets:         getListValues("assetList"),
+        accessibility:  getListValues("a11yList"),
+        analytics:      getListValues("analyticsList"),
         additionalInfo: document.getElementById("additionalInfo").value.trim(),
       }
     }, "*");
   }
 </script>
-
- 
 </body>
 </html>
