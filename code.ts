@@ -4,7 +4,13 @@ figma.showUI(__html__, { width: 480, height: 700 });
 
 let lastSelectedFrameId: string | null = null;
 
-async function getPageData() {
+// Pre-load fonts immediately on plugin open — resolves before user clicks the button
+const fontPromise = Promise.all([
+  figma.loadFontAsync({ family: "Inter", style: "Regular" }),
+  figma.loadFontAsync({ family: "Inter", style: "Bold" }),
+]);
+
+function getPageData() {
   const selection = figma.currentPage.selection;
 
   if (selection.length === 0 || selection[0].type !== "FRAME") {
@@ -17,30 +23,24 @@ async function getPageData() {
         ? "No frame selected. Please select a frame first."
         : "Selection is not a frame. Please select a frame.",
     });
-    // ✅ Do NOT clear lastSelectedFrameId here — keep the last valid one
     return;
   }
 
   const selectedFrame = selection[0] as FrameNode;
-  lastSelectedFrameId = selectedFrame.id; // only update on valid frame
+  lastSelectedFrameId = selectedFrame.id;
+
+  // findAllWithCriteria is synchronous and internally optimised by Figma —
+  // no async calls, no per-node round trips. Instance names match their
+  // main component name in the vast majority of cases.
+  const seen = new Set<string>();
   const componentNames: string[] = [];
-
-  const walk = async (nodes: readonly SceneNode[]) => {
-    for (const node of nodes) {
-      if (node.type === "COMPONENT") {
-        if (node.name && !componentNames.includes(node.name))
-          componentNames.push(node.name);
-      } else if (node.type === "INSTANCE") {
-        const main = await node.getMainComponentAsync();
-        const name = main?.name ?? node.name;
-        if (name && !componentNames.includes(name))
-          componentNames.push(name);
-      }
-      if ("children" in node) await walk(node.children);
+  const nodes = selectedFrame.findAllWithCriteria({ types: ["INSTANCE", "COMPONENT"] });
+  for (const node of nodes) {
+    if (node.name && !seen.has(node.name)) {
+      seen.add(node.name);
+      componentNames.push(node.name);
     }
-  };
-
-  await walk(selectedFrame.children);
+  }
 
   figma.ui.postMessage({
     type: "prefill",
@@ -51,7 +51,7 @@ async function getPageData() {
   });
 }
 
-figma.on("selectionchange", () => { getPageData(); });
+figma.on("selectionchange", getPageData);
 
 type HandoffMsg = {
   type: string;
@@ -73,21 +73,21 @@ type HandoffMsg = {
 
 figma.ui.onmessage = async (msg: HandoffMsg) => {
   if (msg.type === "ready") {
-    await getPageData();
+    getPageData();
     return;
   }
 
   if (msg.type !== "create-handoff") return;
 
-  // ✅ Grab source frame immediately before anything else
   const sourceNode = lastSelectedFrameId
-    ? (figma.getNodeById(lastSelectedFrameId) as FrameNode | null)
+    ? (await figma.getNodeByIdAsync(lastSelectedFrameId) as FrameNode | null)
     : null;
 
-  await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-  await figma.loadFontAsync({ family: "Inter", style: "Bold" });
+  // Fonts are already loading since plugin open — this await is near-instant
+  await fontPromise;
 
-  const FRAME_WIDTH = 680;
+  // Match the handoff width to the source frame, fall back to 680
+  const FRAME_WIDTH = sourceNode ? sourceNode.width : 680;
   const PADDING = 32;
   const INNER_WIDTH = FRAME_WIDTH - PADDING * 2;
 
@@ -95,9 +95,9 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
     const f = figma.createFrame();
     f.name = name;
     f.layoutMode = "VERTICAL";
-    f.primaryAxisSizingMode = "AUTO";
-    f.counterAxisSizingMode = "FIXED";
-    f.resize(INNER_WIDTH, 50);
+    f.primaryAxisSizingMode = "AUTO";   // height hugs content
+    f.counterAxisSizingMode = "FIXED";  // width fixed (STRETCH fills it from parent)
+    f.resize(INNER_WIDTH, 1);           // height=1 so AUTO starts from minimal baseline
     f.itemSpacing = gap;
     f.paddingLeft = padH;
     f.paddingRight = padH;
@@ -119,14 +119,23 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
     return t;
   };
 
+  // Dark mode canvas palette (Radix Slate dark)
+  const C = {
+    bg:      { r: 0.067, g: 0.067, b: 0.075 }, // slate-1  #111113
+    panel:   { r: 0.094, g: 0.098, b: 0.106 }, // slate-2  #18191b
+    border:  { r: 0.212, g: 0.227, b: 0.247 }, // slate-6  #363a3f
+    textLo:  { r: 0.412, g: 0.431, b: 0.467 }, // slate-9  #696e77
+    textHi:  { r: 0.929, g: 0.933, b: 0.941 }, // slate-12 #edeef0
+  };
+
   const root = figma.createFrame();
   root.name = `Handoff – ${msg.screenName || "Screen"}`;
-  root.fills = [{ type: "SOLID", color: { r: 0.97, g: 0.97, b: 0.99 } }];
-  root.cornerRadius = 16;
+  root.fills = [{ type: "SOLID", color: C.bg }];
+  root.cornerRadius = 0;
   root.layoutMode = "VERTICAL";
   root.primaryAxisSizingMode = "AUTO";
   root.counterAxisSizingMode = "FIXED";
-  root.resize(FRAME_WIDTH, 100);
+  root.resize(FRAME_WIDTH, 1); // width fixed; height hugs via AUTO
   root.paddingTop = PADDING;
   root.paddingBottom = PADDING;
   root.paddingLeft = PADDING;
@@ -135,17 +144,17 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
 
   // Header
   const header = makeVFrame("Header", 4);
-  header.appendChild(makeText(msg.screenName || "Screen", 26, true, { r: 0.08, g: 0.08, b: 0.12 }));
+  header.appendChild(makeText(msg.screenName || "Screen", 26, true, C.textHi));
   const meta = [msg.screenType, msg.pageSection].filter(Boolean).join("  ·  ");
-  if (meta) header.appendChild(makeText(meta, 12, false, { r: 0.5, g: 0.5, b: 0.6 }));
-  header.appendChild(makeText("Developer Handoff", 12, false, { r: 0.65, g: 0.65, b: 0.7 }));
+  if (meta) header.appendChild(makeText(meta, 12, false, C.textLo));
+  header.appendChild(makeText("Developer Handoff", 12, false, C.textLo));
   root.appendChild(header);
 
   // Divider
   const divider = figma.createRectangle();
   divider.name = "Divider";
   divider.resize(INNER_WIDTH, 1);
-  divider.fills = [{ type: "SOLID", color: { r: 0.82, g: 0.82, b: 0.88 } }];
+  divider.fills = [{ type: "SOLID", color: C.border }];
   divider.layoutAlign = "STRETCH";
   root.appendChild(divider);
 
@@ -158,19 +167,19 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
     section.layoutMode = "VERTICAL";
     section.primaryAxisSizingMode = "AUTO";
     section.counterAxisSizingMode = "FIXED";
-    section.resize(INNER_WIDTH, 50);
-    section.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
-    section.cornerRadius = 10;
+    section.resize(INNER_WIDTH, 1);
+    section.fills = [{ type: "SOLID", color: C.panel }];
+    section.cornerRadius = 0;
     section.itemSpacing = 0;
     section.layoutAlign = "STRETCH";
-    section.clipsContent = true;
+    // clipsContent removed — it can prevent AUTO height from expanding
 
     const sectionHeader = figma.createFrame();
     sectionHeader.name = "Label";
     sectionHeader.layoutMode = "VERTICAL";
     sectionHeader.primaryAxisSizingMode = "AUTO";
     sectionHeader.counterAxisSizingMode = "FIXED";
-    sectionHeader.resize(INNER_WIDTH, 50);
+    sectionHeader.resize(INNER_WIDTH, 1);
     sectionHeader.fills = [{ type: "SOLID", color, opacity: 0.08 } as SolidPaint];
     sectionHeader.paddingLeft = 14;
     sectionHeader.paddingRight = 14;
@@ -187,8 +196,9 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
       const row = figma.createFrame();
       row.name = `Row ${i + 1}`;
       row.layoutMode = "HORIZONTAL";
-      row.primaryAxisSizingMode = "AUTO";
-      row.counterAxisSizingMode = "AUTO";
+      row.primaryAxisSizingMode = "FIXED";  // width fixed (STRETCH from parent fills it)
+      row.counterAxisSizingMode = "AUTO";   // height hugs tallest child
+      row.resize(INNER_WIDTH, 1);           // explicit initial width so layoutGrow resolves
       row.fills = [];
       row.itemSpacing = 8;
       row.layoutAlign = "STRETCH";
@@ -204,7 +214,7 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
       const itemText = figma.createText();
       itemText.fontName = { family: "Inter", style: "Regular" };
       itemText.fontSize = 13;
-      itemText.fills = [{ type: "SOLID", color: { r: 0.15, g: 0.15, b: 0.22 } }];
+      itemText.fills = [{ type: "SOLID", color: C.textHi }];
       itemText.characters = item;
       itemText.layoutGrow = 1;
       itemText.textAutoResize = "HEIGHT";
@@ -232,25 +242,28 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
 
   for (const s of SECTIONS) addSection(s.label, s.items, s.color as RGB);
 
-  // ✅ Position next to source frame and append BEFORE creating connector
+  // Use absoluteBoundingBox so coords are always in canvas space,
+  // even when the frame lives inside a Section (where x/y are section-relative).
   if (sourceNode) {
-    root.x = sourceNode.x + sourceNode.width + 120;
-    root.y = sourceNode.y;
+    const abs = sourceNode.absoluteBoundingBox;
+    root.x = abs ? abs.x : sourceNode.x;
+    root.y = abs ? abs.y + abs.height + 80 : sourceNode.y + sourceNode.height + 80;
   }
 
   figma.currentPage.appendChild(root);
 
-  // ✅ Connector — both nodes must be on canvas first
+  // Native Figma connector — references nodes by ID so it works whether the
+  // source frame is on the canvas root or nested inside a Section.
   if (sourceNode) {
     try {
       const connector = figma.createConnector();
       figma.currentPage.appendChild(connector);
-      connector.connectorStart = { endpointNodeId: sourceNode.id, magnet: "RIGHT" };
-      connector.connectorEnd   = { endpointNodeId: root.id, magnet: "LEFT" };
+      connector.connectorStart = { endpointNodeId: sourceNode.id, magnet: "BOTTOM" };
+      connector.connectorEnd   = { endpointNodeId: root.id,       magnet: "TOP"    };
       connector.strokeWeight = 2;
-      connector.strokes = [{ type: "SOLID", color: { r: 0.24, g: 0.43, b: 0.98 } }];
+      connector.strokes = [{ type: "SOLID", color: { r: 0.27, g: 0.44, b: 0.98 } }];
       connector.connectorStartStrokeCap = "NONE";
-      connector.connectorEndStrokeCap = "ARROW_EQUILATERAL";
+      connector.connectorEndStrokeCap   = "ARROW_EQUILATERAL";
     } catch (e) {
       console.error("Connector error:", e);
     }

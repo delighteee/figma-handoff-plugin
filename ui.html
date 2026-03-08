@@ -2,48 +2,157 @@
 <html>
 <head>
 <style>
+  /* ── Radix UI dark color scales ─────────────────────────────── */
+  :root {
+    /* Slate */
+    --slate-1:  #111113;
+    --slate-2:  #18191b;
+    --slate-3:  #212225;
+    --slate-4:  #272a2d;
+    --slate-5:  #2e3135;
+    --slate-6:  #363a3f;
+    --slate-7:  #43484e;
+    --slate-8:  #5a6169;
+    --slate-9:  #696e77;
+    --slate-11: #b0b4ba;
+    --slate-12: #edeef0;
+
+    /* Blue */
+    --blue-3:  #0d2847;
+    --blue-9:  #0090ff;
+    --blue-10: #3b9eff;
+    --blue-11: #70b8ff;
+
+    /* Red */
+    --red-3:  #3b1219;
+    --red-6:  #6f2530;
+    --red-9:  #e5484d;
+    --red-11: #ff6369;
+
+    /* ── Semantic tokens ───────────────────────────────────────── */
+    --color-bg:           var(--slate-1);
+    --color-panel:        var(--slate-2);
+    --color-surface:      var(--slate-3);
+    --color-hover:        var(--slate-4);
+    --color-border:       var(--slate-6);
+    --color-border-heavy: var(--slate-7);
+    --color-text:         var(--slate-12);
+    --color-text-2:       var(--slate-11);
+    --color-text-3:       var(--slate-9);
+    --color-placeholder:  var(--slate-8);
+    --color-accent:       var(--blue-9);
+    --color-accent-hover: var(--blue-10);
+    --color-accent-text:  var(--blue-11);
+    --color-accent-bg:    var(--blue-3);
+    --color-error-bg:     var(--red-3);
+    --color-error-border: var(--red-6);
+    --color-error-text:   var(--red-11);
+    --color-error-solid:  var(--red-9);
+
+    /* ── Radix spacing scale ───────────────────────────────────── */
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+
+    /* ── Radix radius scale ────────────────────────────────────── */
+    --radius-2: 4px;
+    --radius-3: 6px;
+    --radius-4: 8px;
+    --radius-full: 9999px;
+
+    /* ── Radix font-size scale ─────────────────────────────────── */
+    --text-1: 11px;
+    --text-2: 13px;
+    --text-3: 15px;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, sans-serif; }
 
-  body { padding: 16px; background: #f9f9fb; color: #111; font-size: 13px; }
+  body {
+    padding: var(--space-4);
+    padding-bottom: 70px;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-size: var(--text-2);
+  }
 
-  h2 { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+  h2 { font-size: var(--text-3); font-weight: 700; margin-bottom: 3px; color: var(--color-text); }
 
-  .subtitle { font-size: 11px; color: #888; margin-bottom: 14px; }
+  .subtitle { font-size: var(--text-1); color: var(--color-text-3); margin-bottom: 14px; }
 
   .badge {
-    display: inline-block; background: #e8f0fe; color: #3460e0;
-    font-size: 10px; font-weight: 600; padding: 2px 7px;
-    border-radius: 20px; margin-left: 6px; vertical-align: middle;
+    display: inline-block;
+    background: var(--color-accent-bg);
+    color: var(--color-accent-text);
+    font-size: 10px; font-weight: 600;
+    padding: 2px 7px;
+    border-radius: var(--radius-full);
+    margin-left: 6px; vertical-align: middle;
     text-transform: uppercase; letter-spacing: 0.3px;
   }
 
-  /* Accordion */
-  .accordion { border: 1px solid #e4e4ea; border-radius: 8px; margin-bottom: 8px; background: #fff; overflow: hidden; }
+  /* ── Accordion ─────────────────────────────────────────────── */
+  .accordion {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-4);
+    margin-bottom: var(--space-2);
+    background: var(--color-panel);
+    overflow: hidden;
+  }
 
   .accordion-header {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 12px;
-    color: #333; user-select: none; background: #fff;
+    padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: var(--text-1);
+    color: var(--color-text-2); user-select: none; background: var(--color-panel);
   }
-  .accordion-header:hover { background: #f4f4f8; }
+  .accordion-header:hover { background: var(--color-hover); }
 
-  .accordion-arrow { font-size: 10px; color: #aaa; transition: transform 0.2s; }
+  .accordion-arrow { font-size: 10px; color: var(--color-text-3); transition: transform 0.2s; }
   .accordion.open .accordion-arrow { transform: rotate(180deg); }
 
-  .accordion-body { display: none; padding: 12px 14px; border-top: 1px solid #eee; }
+  .accordion-body {
+    display: none;
+    padding: var(--space-3) 14px;
+    border-top: 1px solid var(--color-border);
+  }
   .accordion.open .accordion-body { display: block; }
 
   label {
     display: block; font-weight: 600; margin-bottom: 5px;
-    color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--color-text-3); font-size: var(--text-1);
+    text-transform: uppercase; letter-spacing: 0.4px;
   }
 
   input[type="text"], textarea, select {
-    width: 100%; padding: 7px 10px; border: 1px solid #ddd;
-    border-radius: 6px; font-size: 13px; background: #fff; color: #111; margin-bottom: 8px;
+    width: 100%; padding: 7px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-3);
+    font-size: var(--text-2);
+    background: var(--color-surface);
+    color: var(--color-text);
+    margin-bottom: var(--space-2);
   }
-  input[type="text"]:focus, textarea:focus, select:focus { outline: none; border-color: #4570f5; }
-  input.prefilled, textarea.prefilled { border-color: #a8c4ff; background: #f0f4ff; }
+  input[type="text"]::placeholder,
+  textarea::placeholder { color: var(--color-placeholder); }
+
+  input[type="text"]:focus, textarea:focus, select:focus {
+    outline: none; border-color: var(--color-accent);
+  }
+  input.prefilled, textarea.prefilled {
+    border-color: var(--blue-3);
+    background: var(--blue-3);
+  }
+
+  /* Custom dark select arrow */
+  select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23696e77' d='M5 7L1 3h8z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+    cursor: pointer;
+  }
+  select option { background: var(--color-surface); color: var(--color-text); }
 
   textarea { resize: vertical; min-height: 60px; }
 
@@ -51,28 +160,58 @@
   .field-row { display: flex; gap: 5px; align-items: center; }
   .field-row input { flex: 1; margin: 0; }
 
-  .remove-btn { background: none; border: none; cursor: pointer; color: #bbb; font-size: 15px; padding: 0 3px; }
-  .remove-btn:hover { color: #e55; }
+  .remove-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--color-text-3); font-size: 15px; padding: 0 3px;
+    transition: color 0.15s;
+  }
+  .remove-btn:hover { color: var(--color-error-solid); }
 
   .add-btn {
-    background: none; border: 1px dashed #ccc; border-radius: 6px;
-    color: #999; font-size: 11px; padding: 5px 10px; cursor: pointer; width: 100%;
+    background: none;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-3);
+    color: var(--color-text-3);
+    font-size: var(--text-1); padding: 5px 10px; cursor: pointer; width: 100%;
+    transition: border-color 0.15s, color 0.15s;
   }
-  .add-btn:hover { border-color: #4570f5; color: #4570f5; }
+  .add-btn:hover { border-color: var(--color-accent); color: var(--color-accent-text); }
 
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 
+  /* ── CTA button ────────────────────────────────────────────── */
   .create-btn {
-    width: 100%; padding: 12px; background: #4570f5; color: white;
-    border: none; border-radius: 8px; font-size: 14px; font-weight: 600;
-    cursor: pointer; margin-top: 10px; position: sticky; bottom: 0;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    width: 100%; padding: 14px 16px;
+    background: var(--color-accent);
+    color: #fff;
+    border: none; border-top: 1px solid var(--color-accent-hover);
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: background 0.15s;
   }
-  .create-btn:hover { background: #3460e0; }
+  .create-btn:hover   { background: var(--color-accent-hover); }
+  .create-btn:active  { background: var(--blue-10); transform: scale(0.99); }
+  .create-btn:disabled {
+    background: var(--color-border-heavy);
+    color: var(--color-text-3);
+    cursor: not-allowed; transform: none;
+  }
 
+  /* ── Error banner ──────────────────────────────────────────── */
   .error-banner {
-    background: #fff0f0; border: 1px solid #ffcccc; border-radius: 6px;
-    padding: 10px 14px; color: #c00; font-size: 12px; margin-bottom: 12px; display: none;
+    background: var(--color-error-bg);
+    border: 1px solid var(--color-error-border);
+    border-radius: var(--radius-3);
+    padding: 10px 14px;
+    color: var(--color-error-text);
+    font-size: var(--text-1); margin-bottom: var(--space-3); display: none;
   }
+
+  /* ── Scrollbar ─────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--color-bg); }
+  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: var(--radius-full); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-border-heavy); }
 </style>
 </head>
 <body>
@@ -271,6 +410,14 @@
 <button class="create-btn" onclick="createHandoff()">Create Handoff Template</button>
 
 <script>
+  // Radix token values mirrored for JS badge state updates
+  const TOKEN = {
+    accentBg:   '#0d2847',
+    accentText: '#70b8ff',
+    errorBg:    '#3b1219',
+    errorText:  '#ff6369',
+  };
+
   window.onload = () => {
     parent.postMessage({ pluginMessage: { type: "ready" } }, "*");
   };
@@ -288,8 +435,8 @@
 
     if (msg.error) {
       badge.textContent = "⚠ No frame selected";
-      badge.style.background = "#fff0f0";
-      badge.style.color = "#e55";
+      badge.style.background = TOKEN.errorBg;
+      badge.style.color = TOKEN.errorText;
       errorBanner.textContent = msg.error;
       errorBanner.style.display = "block";
       addRow("interactionList", "e.g. Tap button → triggers action");
@@ -297,8 +444,8 @@
     }
 
     errorBanner.style.display = "none";
-    badge.style.background = "#e8f0fe";
-    badge.style.color = "#3460e0";
+    badge.style.background = TOKEN.accentBg;
+    badge.style.color = TOKEN.accentText;
     badge.textContent = `${(msg.componentNames || []).length} components found`;
 
     // Prefill screen name
@@ -354,6 +501,18 @@
   }
 
   function createHandoff() {
+    const screenName = document.getElementById("screenName").value.trim();
+    if (!screenName) {
+      document.getElementById("screenName").focus();
+      document.getElementById("screenName").style.borderColor = "#e5484d";
+      return;
+    }
+    document.getElementById("screenName").style.borderColor = "";
+
+    const btn = document.querySelector(".create-btn");
+    btn.disabled = true;
+    btn.textContent = "Creating…";
+
     parent.postMessage({
       pluginMessage: {
         type: "create-handoff",
