@@ -141,6 +141,7 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
 
   if (msg.type !== "create-handoff") return;
 
+  try {
   const sourceNode = lastSelectedFrameId
     ? (await figma.getNodeByIdAsync(lastSelectedFrameId) as FrameNode | null)
     : null;
@@ -336,4 +337,8 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
   figma.viewport.scrollAndZoomIntoView(sourceNode ? [sourceNode, root] : [root]);
   figma.notify("Handoff created ✅");
   figma.closePlugin();
+  } catch (e) {
+    console.error("Handoff error:", e);
+    figma.ui.postMessage({ type: "create-error", message: String(e) });
+  }
 };

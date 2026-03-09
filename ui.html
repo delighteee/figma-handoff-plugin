@@ -555,6 +555,14 @@
     const msg = event.data.pluginMessage;
     if (!msg) return;
 
+    if (msg.type === "create-error") {
+      const btn = document.querySelector(".create-btn");
+      clearTimeout(btn._resetTimer);
+      btn.disabled = false;
+      btn.textContent = "Create Handoff Template";
+      return;
+    }
+
     if (msg.type === "suggestions") {
       const panel = document.getElementById("suggestions-panel");
       const list  = document.getElementById("suggestions-list");
@@ -671,6 +679,13 @@
     const btn = document.querySelector(".create-btn");
     btn.disabled = true;
     btn.textContent = "Creating…";
+
+    // Safety fallback — re-enable if plugin doesn't respond within 15s
+    const resetBtn = setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = "Create Handoff Template";
+    }, 15000);
+    btn._resetTimer = resetBtn;
 
     parent.postMessage({
       pluginMessage: {
