@@ -11,7 +11,7 @@ const fontPromise = Promise.all([
   figma.loadFontAsync({ family: "DM Mono", style: "Medium" }),
 ]);
 
-function getPageData() {
+async function getPageData() {
   const selection = figma.currentPage.selection;
 
   if (selection.length === 0 || selection[0].type !== "FRAME") {
@@ -24,6 +24,7 @@ function getPageData() {
         ? "No frame selected. Please select a frame first."
         : "Selection is not a frame. Please select a frame.",
     });
+    figma.ui.postMessage({ type: "suggestions", items: [] });
     return;
   }
 
@@ -50,6 +51,65 @@ function getPageData() {
     componentNames,
     error: null,
   });
+
+  figma.ui.postMessage({ type: "suggestions", items: await scanForIssues(selectedFrame) });
+}
+
+type Issue = { id: string; category: "design" | "a11y"; message: string };
+
+async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
+  const issues: Issue[] = [];
+  let n = 0;
+  const nextId = () => String(n++);
+
+  const [paintStyles, textStyles] = await Promise.all([
+    figma.getLocalPaintStylesAsync(),
+    figma.getLocalTextStylesAsync(),
+  ]);
+
+  // ── Text checks ──────────────────────────────────────────────
+  const textNodes = frame.findAllWithCriteria({ types: ["TEXT"] }) as TextNode[];
+
+  if (textStyles.length > 0) {
+    const unstyled = textNodes.filter(t => !t.textStyleId || t.textStyleId === figma.mixed);
+    if (unstyled.length > 0)
+      issues.push({ id: nextId(), category: "design",
+        message: `${unstyled.length} text layer${unstyled.length > 1 ? "s" : ""} not linked to a text style` });
+  }
+
+  const smallText = textNodes.filter(t => typeof t.fontSize === "number" && (t.fontSize as number) < 11);
+  if (smallText.length > 0)
+    issues.push({ id: nextId(), category: "a11y",
+      message: `${smallText.length} text layer${smallText.length > 1 ? "s use" : " uses"} font size < 11px — may be unreadable` });
+
+  // ── Fill style checks ─────────────────────────────────────────
+  if (paintStyles.length > 0) {
+    const fillable = frame.findAllWithCriteria({ types: ["RECTANGLE", "ELLIPSE", "FRAME", "INSTANCE", "COMPONENT"] });
+    const unstyledFills = fillable.filter(node => {
+      const fills = (node as GeometryMixin).fills;
+      if (!fills || fills === figma.mixed) return false;
+      const visible = (fills as ReadonlyArray<Paint>).filter(f => f.visible !== false);
+      if (visible.length === 0) return false;
+      const styleId = (node as { fillStyleId?: string | symbol }).fillStyleId;
+      return !styleId || styleId === figma.mixed;
+    });
+    if (unstyledFills.length > 0)
+      issues.push({ id: nextId(), category: "design",
+        message: `${unstyledFills.length} layer${unstyledFills.length > 1 ? "s use" : " uses"} raw fill colors — not from the style library` });
+  }
+
+  // ── Touch target checks ───────────────────────────────────────
+  const instances = frame.findAllWithCriteria({ types: ["INSTANCE"] }) as InstanceNode[];
+  const interactiveKw = ["button", "btn", "tab", "icon", "chip", "toggle", "checkbox", "radio", "fab", "cta"];
+  const smallTargets = instances.filter(inst => {
+    const name = inst.name.toLowerCase();
+    return interactiveKw.some(k => name.includes(k)) && (inst.width < 44 || inst.height < 44);
+  });
+  if (smallTargets.length > 0)
+    issues.push({ id: nextId(), category: "a11y",
+      message: `${smallTargets.length} interactive component${smallTargets.length > 1 ? "s" : ""} may have touch targets below 44pt` });
+
+  return issues;
 }
 
 figma.on("selectionchange", getPageData);

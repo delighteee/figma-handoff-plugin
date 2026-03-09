@@ -207,6 +207,42 @@
     font-size: var(--text-1); margin-bottom: var(--space-3); display: none;
   }
 
+  /* ── Suggestions panel ──────────────────────────────────────── */
+  .suggestions-panel { margin-bottom: var(--space-2); }
+
+  .suggestions-title {
+    font-size: var(--text-1); font-weight: 600; color: var(--color-text-3);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
+  }
+
+  .suggestion-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 8px 12px;
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-3);
+    margin-bottom: 5px;
+    font-size: var(--text-1); line-height: 1.5;
+  }
+
+  .suggestion-cat {
+    font-size: 10px; font-weight: 700; padding: 1px 6px;
+    border-radius: var(--radius-full); white-space: nowrap;
+    flex-shrink: 0; margin-top: 1px; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .suggestion-cat.design { background: var(--blue-3); color: var(--blue-11); }
+  .suggestion-cat.a11y   { background: #2d1b00; color: #ffb224; }
+
+  .suggestion-msg { flex: 1; color: var(--color-text-2); }
+
+  .suggestion-dismiss {
+    background: none; border: none; cursor: pointer;
+    color: var(--color-text-3); font-size: 15px; padding: 0;
+    line-height: 1; flex-shrink: 0; transition: color 0.15s;
+  }
+  .suggestion-dismiss:hover { color: var(--color-error-solid); }
+
   /* ── Scrollbar ─────────────────────────────────────────────── */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: var(--color-bg); }
@@ -220,6 +256,14 @@
 <p class="subtitle">Select a frame — fields auto-populate from your selection.</p>
 
 <div class="error-banner" id="errorBanner"></div>
+
+<!-- Suggestions panel -->
+<div id="suggestions-panel" class="suggestions-panel" style="display:none">
+  <div class="suggestions-title">
+    Suggestions <span id="suggestions-count" class="badge">0</span>
+  </div>
+  <div id="suggestions-list"></div>
+</div>
 
 <!-- 1. Screen Identity -->
 <div class="accordion open" id="acc-identity">
@@ -424,7 +468,30 @@
 
   window.onmessage = (event) => {
     const msg = event.data.pluginMessage;
-    if (!msg || msg.type !== "prefill") return;
+    if (!msg) return;
+
+    if (msg.type === "suggestions") {
+      const panel = document.getElementById("suggestions-panel");
+      const list  = document.getElementById("suggestions-list");
+      const count = document.getElementById("suggestions-count");
+      list.innerHTML = "";
+      if (!msg.items || msg.items.length === 0) { panel.style.display = "none"; return; }
+      msg.items.forEach(item => {
+        const el = document.createElement("div");
+        el.className = "suggestion-item";
+        el.innerHTML = `
+          <span class="suggestion-cat ${item.category}">${item.category === "a11y" ? "A11Y" : "Design"}</span>
+          <span class="suggestion-msg">${escapeHtml(item.message)}</span>
+          <button class="suggestion-dismiss" onclick="dismissSuggestion(this)" title="Dismiss">✕</button>
+        `;
+        list.appendChild(el);
+      });
+      count.textContent = String(msg.items.length);
+      panel.style.display = "block";
+      return;
+    }
+
+    if (msg.type !== "prefill") return;
 
     const badge = document.getElementById("badge");
     const errorBanner = document.getElementById("errorBanner");
@@ -456,6 +523,16 @@
     // Start interactions blank
     addRow("interactionList", "e.g. Tap button → triggers action");
   };
+
+  function dismissSuggestion(btn) {
+    btn.closest(".suggestion-item").remove();
+    const remaining = document.querySelectorAll(".suggestion-item").length;
+    if (remaining === 0) {
+      document.getElementById("suggestions-panel").style.display = "none";
+    } else {
+      document.getElementById("suggestions-count").textContent = String(remaining);
+    }
+  }
 
   function toggleAcc(id) {
     document.getElementById(id).classList.toggle("open");
