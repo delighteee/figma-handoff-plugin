@@ -63,7 +63,7 @@ async function getPageData() {
   figma.ui.postMessage({ type: "suggestions", items: await scanForIssues(selectedFrame) });
 }
 
-type Issue = { id: string; category: "design" | "a11y"; message: string };
+type Issue = { id: string; category: "design" | "a11y" | "ux"; message: string };
 
 async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   const issues: Issue[] = [];
@@ -116,6 +116,98 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   if (smallTargets.length > 0)
     issues.push({ id: nextId(), category: "a11y",
       message: `${smallTargets.length} interactive component${smallTargets.length > 1 ? "s" : ""} may have touch targets below 44pt` });
+
+  // ── UX Heuristics checks ──────────────────────────────────────
+
+  // H1 — Visibility of system status:
+  // Flag if frame looks data-heavy (has list/grid/table) but no loading/skeleton/spinner
+  const hasDataStructure = instances.some(inst => {
+    const n = inst.name.toLowerCase();
+    return ["list", "grid", "table", "feed", "card"].some(k => n.includes(k));
+  });
+  const hasLoadingState = instances.some(inst => {
+    const n = inst.name.toLowerCase();
+    return ["loading", "skeleton", "spinner", "shimmer", "progress"].some(k => n.includes(k));
+  });
+  if (hasDataStructure && !hasLoadingState)
+    issues.push({ id: nextId(), category: "ux",
+      message: "Data list/grid present but no loading or skeleton state found — users need feedback while content loads (Nielsen #1)" });
+
+  // H3 — User control and freedom:
+  // Destructive action without a confirmation or undo mechanism nearby
+  const destructiveKw = ["delete", "remove", "discard", "clear", "reset"];
+  const confirmKw     = ["confirm", "undo", "cancel", "are you sure", "warning"];
+  const hasDestructive = instances.some(inst => destructiveKw.some(k => inst.name.toLowerCase().includes(k)));
+  if (hasDestructive) {
+    const hasConfirmInst = instances.some(inst => confirmKw.some(k => inst.name.toLowerCase().includes(k)));
+    const hasConfirmText = textNodes.some(t => {
+      const chars = typeof t.characters === "string" ? t.characters.toLowerCase() : "";
+      return confirmKw.some(k => chars.includes(k));
+    });
+    if (!hasConfirmInst && !hasConfirmText)
+      issues.push({ id: nextId(), category: "ux",
+        message: "Destructive action (delete/remove) detected with no visible confirmation or undo — users need an escape hatch (Nielsen #3)" });
+  }
+
+  // H4 — Consistency and standards:
+  // Multiple competing primary CTAs dilute the visual hierarchy
+  const primaryKw = ["button/primary", "btn-primary", "/primary", "cta", "filled button", "contained button"];
+  const primaryCtaCount = instances.filter(inst =>
+    primaryKw.some(k => inst.name.toLowerCase().includes(k))
+  ).length;
+  if (primaryCtaCount > 1)
+    issues.push({ id: nextId(), category: "ux",
+      message: `${primaryCtaCount} primary CTA buttons found — a single dominant action reduces cognitive load (Nielsen #4)` });
+
+  // H5 — Error prevention:
+  // Form inputs present but no error/validation state indicators visible
+  const hasFormInputs = instances.some(inst => {
+    const n = inst.name.toLowerCase();
+    return ["input", "text field", "textfield", "field", "form"].some(k => n.includes(k));
+  });
+  const hasErrorState = instances.some(inst => {
+    const n = inst.name.toLowerCase();
+    return ["error", "validation", "invalid", "required"].some(k => n.includes(k));
+  });
+  if (hasFormInputs && !hasErrorState)
+    issues.push({ id: nextId(), category: "ux",
+      message: "Form inputs found but no error/validation state components — consider showing inline validation (Nielsen #5)" });
+
+  // H6 — Recognition rather than recall:
+  // Icon-only interactive components with no visible label
+  const iconOnlyKw = ["icon button", "icon-btn", "icon/button", "fab", "icon only"];
+  const unlabelledIcons = instances.filter(inst => {
+    const n = inst.name.toLowerCase();
+    if (!iconOnlyKw.some(k => n.includes(k))) return false;
+    // Check if the instance itself contains any text child
+    const hasLabel = inst.findAllWithCriteria({ types: ["TEXT"] }).some(
+      t => (t as TextNode).characters && (t as TextNode).characters.trim().length > 0
+    );
+    return !hasLabel;
+  });
+  if (unlabelledIcons.length > 0)
+    issues.push({ id: nextId(), category: "ux",
+      message: `${unlabelledIcons.length} icon-only button${unlabelledIcons.length > 1 ? "s" : ""} with no visible label — consider a tooltip or label (Nielsen #6)` });
+
+  // H8 — Aesthetic and minimalist design:
+  // Excessive text density (many text nodes with small font)
+  const denseText = textNodes.filter(t => typeof t.fontSize === "number" && (t.fontSize as number) <= 12);
+  if (denseText.length > 20)
+    issues.push({ id: nextId(), category: "ux",
+      message: `${denseText.length} small text layers (≤12px) — high text density may hurt readability; consider progressive disclosure (Nielsen #8)` });
+
+  // Heuristic: sub-screens (modals, sheets, detail views) should have a back/close nav
+  const frameLower = frame.name.toLowerCase();
+  const isSubScreen = ["modal", "sheet", "dialog", "drawer", "overlay", "detail", "popup"].some(k => frameLower.includes(k));
+  if (isSubScreen) {
+    const hasExit = instances.some(inst => {
+      const n = inst.name.toLowerCase();
+      return ["back", "close", "dismiss", "arrow-left", "chevron-left", "nav-back"].some(k => n.includes(k));
+    });
+    if (!hasExit)
+      issues.push({ id: nextId(), category: "ux",
+        message: `"${frame.name}" looks like a sub-screen but has no back or close navigation — users need a clear exit (Nielsen #3)` });
+  }
 
   return issues;
 }

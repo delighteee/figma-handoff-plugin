@@ -243,6 +243,7 @@
   }
   .suggestion-cat.design { background: var(--blue-3); color: var(--blue-11); }
   .suggestion-cat.a11y   { background: #2d1b00; color: #ffb224; }
+  .suggestion-cat.ux     { background: #0d2d24; color: #30d986; }
 
   .suggestion-msg { flex: 1; color: var(--color-text-2); }
 
@@ -592,7 +593,7 @@
         const el = document.createElement("div");
         el.className = "suggestion-item";
         el.innerHTML = `
-          <span class="suggestion-cat ${item.category}">${item.category === "a11y" ? "A11Y" : "Design"}</span>
+          <span class="suggestion-cat ${item.category}">${item.category === "a11y" ? "A11Y" : item.category === "ux" ? "UX" : "Design"}</span>
           <span class="suggestion-msg">${escapeHtml(item.message)}</span>
           <button class="suggestion-dismiss" onclick="dismissSuggestion(this)" title="Dismiss">✕</button>
         `;
