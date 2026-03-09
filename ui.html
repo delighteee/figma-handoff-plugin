@@ -247,6 +247,15 @@
 
   .suggestion-msg { flex: 1; color: var(--color-text-2); }
 
+  .suggestion-show {
+    background: none; border: none; cursor: pointer;
+    color: var(--color-accent-text); font-size: 10px; font-weight: 600;
+    padding: 0; white-space: nowrap; flex-shrink: 0;
+    text-decoration: underline; text-underline-offset: 2px;
+    transition: color 0.15s;
+  }
+  .suggestion-show:hover { color: var(--blue-10); }
+
   .suggestion-dismiss {
     background: none; border: none; cursor: pointer;
     color: var(--color-text-3); font-size: 15px; padding: 0;
@@ -592,9 +601,17 @@
       msg.items.forEach(item => {
         const el = document.createElement("div");
         el.className = "suggestion-item";
+        if (item.nodeIds && item.nodeIds.length > 0) {
+          el.dataset.nodeIds = JSON.stringify(item.nodeIds);
+        }
+        const label = item.category === "a11y" ? "A11Y" : item.category === "ux" ? "UX" : "Design";
+        const showBtn = (item.nodeIds && item.nodeIds.length > 0)
+          ? `<button class="suggestion-show" onclick="showNodes(this)" title="Select in Figma">Show</button>`
+          : "";
         el.innerHTML = `
-          <span class="suggestion-cat ${item.category}">${item.category === "a11y" ? "A11Y" : item.category === "ux" ? "UX" : "Design"}</span>
+          <span class="suggestion-cat ${item.category}">${label}</span>
           <span class="suggestion-msg">${escapeHtml(item.message)}</span>
+          ${showBtn}
           <button class="suggestion-dismiss" onclick="dismissSuggestion(this)" title="Dismiss">✕</button>
         `;
         list.appendChild(el);
@@ -644,6 +661,14 @@
       if (raw) setFormState(JSON.parse(raw));
     } catch(e) { /* localStorage unavailable or parse failed */ }
   };
+
+  function showNodes(btn) {
+    const item = btn.closest(".suggestion-item");
+    const nodeIds = JSON.parse(item.dataset.nodeIds || "[]");
+    if (nodeIds.length > 0) {
+      parent.postMessage({ pluginMessage: { type: "show-nodes", nodeIds } }, "*");
+    }
+  }
 
   function dismissSuggestion(btn) {
     btn.closest(".suggestion-item").remove();

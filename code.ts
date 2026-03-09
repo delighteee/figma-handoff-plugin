@@ -63,7 +63,7 @@ async function getPageData() {
   figma.ui.postMessage({ type: "suggestions", items: await scanForIssues(selectedFrame) });
 }
 
-type Issue = { id: string; category: "design" | "a11y" | "ux"; message: string };
+type Issue = { id: string; category: "design" | "a11y" | "ux"; message: string; nodeIds?: string[] };
 
 async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   const issues: Issue[] = [];
@@ -75,6 +75,8 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
     figma.getLocalTextStylesAsync(),
   ]);
 
+  const ids = (nodes: { id: string }[], cap = 20) => nodes.slice(0, cap).map(n => n.id);
+
   // ── Text checks ──────────────────────────────────────────────
   const textNodes = frame.findAllWithCriteria({ types: ["TEXT"] }) as TextNode[];
 
@@ -82,13 +84,15 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
     const unstyled = textNodes.filter(t => !t.textStyleId || t.textStyleId === figma.mixed);
     if (unstyled.length > 0)
       issues.push({ id: nextId(), category: "design",
-        message: `${unstyled.length} text layer${unstyled.length > 1 ? "s" : ""} not linked to a text style` });
+        message: `${unstyled.length} text layer${unstyled.length > 1 ? "s" : ""} not linked to a text style`,
+        nodeIds: ids(unstyled) });
   }
 
   const smallText = textNodes.filter(t => typeof t.fontSize === "number" && (t.fontSize as number) < 11);
   if (smallText.length > 0)
     issues.push({ id: nextId(), category: "a11y",
-      message: `${smallText.length} text layer${smallText.length > 1 ? "s use" : " uses"} font size < 11px — may be unreadable` });
+      message: `${smallText.length} text layer${smallText.length > 1 ? "s use" : " uses"} font size < 11px — may be unreadable`,
+      nodeIds: ids(smallText) });
 
   // ── Fill style checks ─────────────────────────────────────────
   if (paintStyles.length > 0) {
@@ -103,7 +107,8 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
     });
     if (unstyledFills.length > 0)
       issues.push({ id: nextId(), category: "design",
-        message: `${unstyledFills.length} layer${unstyledFills.length > 1 ? "s use" : " uses"} raw fill colors — not from the style library` });
+        message: `${unstyledFills.length} layer${unstyledFills.length > 1 ? "s use" : " uses"} raw fill colors — not from the style library`,
+        nodeIds: ids(unstyledFills) });
   }
 
   // ── Touch target checks ───────────────────────────────────────
@@ -115,30 +120,27 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   });
   if (smallTargets.length > 0)
     issues.push({ id: nextId(), category: "a11y",
-      message: `${smallTargets.length} interactive component${smallTargets.length > 1 ? "s" : ""} may have touch targets below 44pt` });
+      message: `${smallTargets.length} interactive component${smallTargets.length > 1 ? "s" : ""} may have touch targets below 44pt`,
+      nodeIds: ids(smallTargets) });
 
   // ── UX Heuristics checks ──────────────────────────────────────
 
-  // H1 — Visibility of system status:
-  // Flag if frame looks data-heavy (has list/grid/table) but no loading/skeleton/spinner
-  const hasDataStructure = instances.some(inst => {
-    const n = inst.name.toLowerCase();
-    return ["list", "grid", "table", "feed", "card"].some(k => n.includes(k));
-  });
-  const hasLoadingState = instances.some(inst => {
-    const n = inst.name.toLowerCase();
-    return ["loading", "skeleton", "spinner", "shimmer", "progress"].some(k => n.includes(k));
-  });
-  if (hasDataStructure && !hasLoadingState)
+  // H1 — Visibility of system status
+  const dataInsts = instances.filter(inst =>
+    ["list", "grid", "table", "feed", "card"].some(k => inst.name.toLowerCase().includes(k)));
+  const hasLoadingState = instances.some(inst =>
+    ["loading", "skeleton", "spinner", "shimmer", "progress"].some(k => inst.name.toLowerCase().includes(k)));
+  if (dataInsts.length > 0 && !hasLoadingState)
     issues.push({ id: nextId(), category: "ux",
-      message: "Data list/grid present but no loading or skeleton state found — users need feedback while content loads (Nielsen #1)" });
+      message: "Data list/grid present but no loading or skeleton state found — users need feedback while content loads (Nielsen #1)",
+      nodeIds: ids(dataInsts) });
 
-  // H3 — User control and freedom:
-  // Destructive action without a confirmation or undo mechanism nearby
+  // H3 — User control and freedom: destructive action without confirm/undo
   const destructiveKw = ["delete", "remove", "discard", "clear", "reset"];
   const confirmKw     = ["confirm", "undo", "cancel", "are you sure", "warning"];
-  const hasDestructive = instances.some(inst => destructiveKw.some(k => inst.name.toLowerCase().includes(k)));
-  if (hasDestructive) {
+  const destructiveInsts = instances.filter(inst =>
+    destructiveKw.some(k => inst.name.toLowerCase().includes(k)));
+  if (destructiveInsts.length > 0) {
     const hasConfirmInst = instances.some(inst => confirmKw.some(k => inst.name.toLowerCase().includes(k)));
     const hasConfirmText = textNodes.some(t => {
       const chars = typeof t.characters === "string" ? t.characters.toLowerCase() : "";
@@ -146,67 +148,58 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
     });
     if (!hasConfirmInst && !hasConfirmText)
       issues.push({ id: nextId(), category: "ux",
-        message: "Destructive action (delete/remove) detected with no visible confirmation or undo — users need an escape hatch (Nielsen #3)" });
+        message: "Destructive action (delete/remove) detected with no visible confirmation or undo — users need an escape hatch (Nielsen #3)",
+        nodeIds: ids(destructiveInsts) });
   }
 
-  // H4 — Consistency and standards:
-  // Multiple competing primary CTAs dilute the visual hierarchy
+  // H4 — Consistency and standards: multiple primary CTAs
   const primaryKw = ["button/primary", "btn-primary", "/primary", "cta", "filled button", "contained button"];
-  const primaryCtaCount = instances.filter(inst =>
-    primaryKw.some(k => inst.name.toLowerCase().includes(k))
-  ).length;
-  if (primaryCtaCount > 1)
+  const primaryCtaInsts = instances.filter(inst =>
+    primaryKw.some(k => inst.name.toLowerCase().includes(k)));
+  if (primaryCtaInsts.length > 1)
     issues.push({ id: nextId(), category: "ux",
-      message: `${primaryCtaCount} primary CTA buttons found — a single dominant action reduces cognitive load (Nielsen #4)` });
+      message: `${primaryCtaInsts.length} primary CTA buttons found — a single dominant action reduces cognitive load (Nielsen #4)`,
+      nodeIds: ids(primaryCtaInsts) });
 
-  // H5 — Error prevention:
-  // Form inputs present but no error/validation state indicators visible
-  const hasFormInputs = instances.some(inst => {
-    const n = inst.name.toLowerCase();
-    return ["input", "text field", "textfield", "field", "form"].some(k => n.includes(k));
-  });
-  const hasErrorState = instances.some(inst => {
-    const n = inst.name.toLowerCase();
-    return ["error", "validation", "invalid", "required"].some(k => n.includes(k));
-  });
-  if (hasFormInputs && !hasErrorState)
+  // H5 — Error prevention: form inputs with no error state
+  const formInputInsts = instances.filter(inst =>
+    ["input", "text field", "textfield", "field", "form"].some(k => inst.name.toLowerCase().includes(k)));
+  const hasErrorState = instances.some(inst =>
+    ["error", "validation", "invalid", "required"].some(k => inst.name.toLowerCase().includes(k)));
+  if (formInputInsts.length > 0 && !hasErrorState)
     issues.push({ id: nextId(), category: "ux",
-      message: "Form inputs found but no error/validation state components — consider showing inline validation (Nielsen #5)" });
+      message: "Form inputs found but no error/validation state components — consider showing inline validation (Nielsen #5)",
+      nodeIds: ids(formInputInsts) });
 
-  // H6 — Recognition rather than recall:
-  // Icon-only interactive components with no visible label
+  // H6 — Recognition rather than recall: icon-only buttons
   const iconOnlyKw = ["icon button", "icon-btn", "icon/button", "fab", "icon only"];
   const unlabelledIcons = instances.filter(inst => {
-    const n = inst.name.toLowerCase();
-    if (!iconOnlyKw.some(k => n.includes(k))) return false;
-    // Check if the instance itself contains any text child
-    const hasLabel = inst.findAllWithCriteria({ types: ["TEXT"] }).some(
-      t => (t as TextNode).characters && (t as TextNode).characters.trim().length > 0
-    );
-    return !hasLabel;
+    if (!iconOnlyKw.some(k => inst.name.toLowerCase().includes(k))) return false;
+    return !inst.findAllWithCriteria({ types: ["TEXT"] }).some(
+      t => (t as TextNode).characters && (t as TextNode).characters.trim().length > 0);
   });
   if (unlabelledIcons.length > 0)
     issues.push({ id: nextId(), category: "ux",
-      message: `${unlabelledIcons.length} icon-only button${unlabelledIcons.length > 1 ? "s" : ""} with no visible label — consider a tooltip or label (Nielsen #6)` });
+      message: `${unlabelledIcons.length} icon-only button${unlabelledIcons.length > 1 ? "s" : ""} with no visible label — consider a tooltip or label (Nielsen #6)`,
+      nodeIds: ids(unlabelledIcons) });
 
-  // H8 — Aesthetic and minimalist design:
-  // Excessive text density (many text nodes with small font)
+  // H8 — Aesthetic and minimalist design: excessive text density
   const denseText = textNodes.filter(t => typeof t.fontSize === "number" && (t.fontSize as number) <= 12);
   if (denseText.length > 20)
     issues.push({ id: nextId(), category: "ux",
-      message: `${denseText.length} small text layers (≤12px) — high text density may hurt readability; consider progressive disclosure (Nielsen #8)` });
+      message: `${denseText.length} small text layers (≤12px) — high text density may hurt readability; consider progressive disclosure (Nielsen #8)`,
+      nodeIds: ids(denseText) });
 
-  // Heuristic: sub-screens (modals, sheets, detail views) should have a back/close nav
+  // H3 — Sub-screen with no back/close navigation
   const frameLower = frame.name.toLowerCase();
   const isSubScreen = ["modal", "sheet", "dialog", "drawer", "overlay", "detail", "popup"].some(k => frameLower.includes(k));
   if (isSubScreen) {
-    const hasExit = instances.some(inst => {
-      const n = inst.name.toLowerCase();
-      return ["back", "close", "dismiss", "arrow-left", "chevron-left", "nav-back"].some(k => n.includes(k));
-    });
+    const hasExit = instances.some(inst =>
+      ["back", "close", "dismiss", "arrow-left", "chevron-left", "nav-back"].some(k => inst.name.toLowerCase().includes(k)));
     if (!hasExit)
       issues.push({ id: nextId(), category: "ux",
-        message: `"${frame.name}" looks like a sub-screen but has no back or close navigation — users need a clear exit (Nielsen #3)` });
+        message: `"${frame.name}" looks like a sub-screen but has no back or close navigation — users need a clear exit (Nielsen #3)`,
+        nodeIds: [frame.id] });
   }
 
   return issues;
@@ -230,11 +223,23 @@ type HandoffMsg = {
   accessibility: string[];
   analytics: string[];
   additionalInfo: string;
+  nodeIds?: string[];
 };
 
 figma.ui.onmessage = async (msg: HandoffMsg) => {
   if (msg.type === "ready") {
     getPageData();
+    return;
+  }
+
+  if (msg.type === "show-nodes") {
+    const nodeIds: string[] = msg.nodeIds || [];
+    const resolved = (await Promise.all(nodeIds.map(id => figma.getNodeByIdAsync(id))))
+      .filter((n): n is SceneNode => n !== null && "visible" in n);
+    if (resolved.length > 0) {
+      figma.currentPage.selection = resolved;
+      figma.viewport.scrollAndZoomIntoView(resolved);
+    }
     return;
   }
 
