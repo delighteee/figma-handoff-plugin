@@ -59,6 +59,7 @@ async function getPageData() {
     interactions: componentNames.map(name => `Tap ${name} → `),
     componentNames,
     isComponent: selectedFrame.type === "COMPONENT" || selectedFrame.type === "INSTANCE",
+    specs: extractSpecs(selectedFrame),
     error: null,
   });
 
@@ -213,6 +214,29 @@ async function scanForIssues(frame: FrameNode | ComponentNode | InstanceNode): P
       message: `${denseText.length} small text layers (≤12px) — high text density may hurt readability; consider progressive disclosure (Nielsen #8)`,
       ...ref(denseText) });
 
+  // ── Spacing audit (feature 1) ─────────────────────────────────
+  // Check auto-layout frames for spacing values not on the 4pt grid
+  const layoutContainers = (frame.findAllWithCriteria({ types: ["FRAME", "COMPONENT", "INSTANCE"] }) as (FrameNode | ComponentNode | InstanceNode)[])
+    .filter(n => n.visible !== false && !n.locked && (n as FrameNode).layoutMode !== "NONE");
+  const rootIsLayout = (frame as FrameNode).layoutMode !== "NONE";
+  const allLayoutContainers = rootIsLayout ? [frame as FrameNode, ...layoutContainers] : layoutContainers;
+  const offGrid = allLayoutContainers.filter(f => {
+    const vals = [(f as FrameNode).itemSpacing, (f as FrameNode).paddingLeft, (f as FrameNode).paddingRight, (f as FrameNode).paddingTop, (f as FrameNode).paddingBottom];
+    return vals.some(v => typeof v === "number" && v > 0 && v % 4 !== 0);
+  });
+  if (offGrid.length > 0)
+    issues.push({ id: nextId(), category: "design",
+      message: `${offGrid.length} auto-layout frame${offGrid.length > 1 ? "s use" : " uses"} spacing not on the 4pt grid — align to 4 or 8pt scale`,
+      ...ref(offGrid as SceneNode[]) });
+
+  // ── Missing layer names (feature 3) ──────────────────────────
+  const defaultNameRe = /^(Rectangle|Frame|Ellipse|Group|Vector|Line|Polygon|Star|Image|Text|Component)\s+\d+$/i;
+  const unnamedNodes = frame.findAll(n => defaultNameRe.test(n.name) && n.visible !== false && !n.locked);
+  if (unnamedNodes.length > 0)
+    issues.push({ id: nextId(), category: "design",
+      message: `${unnamedNodes.length} layer${unnamedNodes.length > 1 ? "s have" : " has"} a default name (e.g. "Rectangle 4") — rename layers for developer clarity`,
+      ...ref(unnamedNodes as SceneNode[]) });
+
   // H3 — Sub-screen with no back/close navigation
   const frameLower = frame.name.toLowerCase();
   const isSubScreen = ["modal", "sheet", "dialog", "drawer", "overlay", "detail", "popup"].some(k => frameLower.includes(k));
@@ -226,6 +250,40 @@ async function scanForIssues(frame: FrameNode | ComponentNode | InstanceNode): P
   }
 
   return issues;
+}
+
+// ── Redline specs extraction (feature 5) ─────────────────────────
+function extractSpecs(frame: FrameNode | ComponentNode | InstanceNode): string[] {
+  const specs: string[] = [];
+
+  // Unique font sizes
+  const textNodes = frame.findAllWithCriteria({ types: ["TEXT"] }) as TextNode[];
+  const fontSizes = new Set<number>();
+  textNodes.forEach(t => { if (typeof t.fontSize === "number") fontSizes.add(t.fontSize as number); });
+  if (fontSizes.size > 0)
+    specs.push(`Font sizes: ${[...fontSizes].sort((a, b) => a - b).join(", ")}px`);
+
+  // Unique spacing values from auto-layout containers
+  const containers = [frame, ...frame.findAllWithCriteria({ types: ["FRAME", "COMPONENT", "INSTANCE"] })] as FrameNode[];
+  const spacingVals = new Set<number>();
+  containers.filter(n => (n as FrameNode).layoutMode !== "NONE").forEach(f => {
+    [(f as FrameNode).itemSpacing, (f as FrameNode).paddingLeft, (f as FrameNode).paddingRight, (f as FrameNode).paddingTop, (f as FrameNode).paddingBottom]
+      .filter(v => typeof v === "number" && v > 0)
+      .forEach(v => spacingVals.add(v as number));
+  });
+  if (spacingVals.size > 0)
+    specs.push(`Spacing: ${[...spacingVals].sort((a, b) => a - b).join(", ")}px`);
+
+  // Unique corner radii
+  const radii = new Set<number>();
+  [...frame.findAllWithCriteria({ types: ["FRAME", "RECTANGLE"] })].forEach(n => {
+    const r = (n as FrameNode).cornerRadius;
+    if (typeof r === "number" && r > 0) radii.add(r);
+  });
+  if (radii.size > 0)
+    specs.push(`Corner radii: ${[...radii].sort((a, b) => a - b).join(", ")}px`);
+
+  return specs;
 }
 
 figma.on("selectionchange", getPageData);
@@ -258,8 +316,9 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
   if (msg.type === "show-nodes") {
     const nodeIds: string[] = msg.nodeIds || [];
     const resolved = (await Promise.all(nodeIds.map(id => figma.getNodeByIdAsync(id))))
-      .filter((n): n is SceneNode => n !== null && "visible" in n);
+      .filter((n): n is SceneNode => n !== null && "visible" in n && (n as SceneNode).visible !== false);
     if (resolved.length > 0) {
+      figma.currentPage.selection = resolved;
       figma.viewport.scrollAndZoomIntoView(resolved);
     }
     return;
