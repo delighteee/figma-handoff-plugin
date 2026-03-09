@@ -548,7 +548,9 @@
 
   function saveNow() {
     if (!currentFrameId) return;
-    localStorage.setItem("frame_" + currentFrameId, JSON.stringify(getFormState()));
+    try {
+      localStorage.setItem("frame_" + currentFrameId, JSON.stringify(getFormState()));
+    } catch(e) { /* localStorage unavailable in some sandboxed contexts */ }
   }
 
   function scheduleSave() {
@@ -560,10 +562,9 @@
   document.body.addEventListener("input",  scheduleSave);
   document.body.addEventListener("change", scheduleSave);
 
-  // ─────────────────────────────────────────────────────────────
-  window.onload = () => {
-    parent.postMessage({ pluginMessage: { type: "ready" } }, "*");
-  };
+  // Send ready immediately — script runs after DOM is parsed (end of body),
+  // so we don't need to wait for window.onload which can be unreliable in iframes
+  parent.postMessage({ pluginMessage: { type: "ready" } }, "*");
 
   window.onmessage = (event) => {
     const msg = event.data.pluginMessage;
@@ -574,6 +575,10 @@
       clearTimeout(btn._resetTimer);
       btn.disabled = false;
       btn.textContent = "Create Handoff Template";
+      const eb = document.getElementById("errorBanner");
+      eb.textContent = "Could not create handoff — " + (msg.message || "unknown error. Check that a frame is selected.");
+      eb.style.display = "block";
+      eb.scrollIntoView({ behavior: "smooth", block: "nearest" });
       return;
     }
 
@@ -633,10 +638,10 @@
 
     // Restore saved state if it exists for this frame
     currentFrameId = msg.frameId || null;
-    const saved = currentFrameId
-      ? JSON.parse(localStorage.getItem("frame_" + currentFrameId) || "null")
-      : null;
-    if (saved) setFormState(saved);
+    try {
+      const raw = currentFrameId ? localStorage.getItem("frame_" + currentFrameId) : null;
+      if (raw) setFormState(JSON.parse(raw));
+    } catch(e) { /* localStorage unavailable or parse failed */ }
   };
 
   function dismissSuggestion(btn) {
@@ -681,14 +686,20 @@
   }
 
   function createHandoff() {
-    saveNow(); // persist before plugin closes
+    saveNow();
     const screenName = document.getElementById("screenName").value.trim();
     if (!screenName) {
-      document.getElementById("screenName").focus();
-      document.getElementById("screenName").style.borderColor = "#e5484d";
+      // Make sure Screen Identity accordion is open and field is visible
+      const acc = document.getElementById("acc-identity");
+      if (!acc.classList.contains("open")) acc.classList.add("open");
+      const nameInput = document.getElementById("screenName");
+      nameInput.style.borderColor = "#e5484d";
+      nameInput.scrollIntoView({ behavior: "smooth", block: "center" });
+      nameInput.focus();
       return;
     }
     document.getElementById("screenName").style.borderColor = "";
+    document.getElementById("errorBanner").style.display = "none";
 
     const btn = document.querySelector(".create-btn");
     btn.disabled = true;
