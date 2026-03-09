@@ -89,23 +89,21 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
   // Match the handoff width to the source frame, fall back to 680
   const FRAME_WIDTH = sourceNode ? sourceNode.width : 680;
   const PADDING = 32;
-  const INNER_WIDTH = FRAME_WIDTH - PADDING * 2;
 
   const makeVFrame = (name: string, gap: number, padH = 0, padV = 0, bg?: RGB): FrameNode => {
     const f = figma.createFrame();
     f.name = name;
     f.layoutMode = "VERTICAL";
-    f.primaryAxisSizingMode = "AUTO";   // height hugs content
-    f.counterAxisSizingMode = "FIXED";  // width fixed (STRETCH fills it from parent)
-    f.resize(INNER_WIDTH, 1);           // height=1 so AUTO starts from minimal baseline
+    f.primaryAxisSizingMode = "AUTO"; // height hugs content — no fixed height
+    f.counterAxisSizingMode = "AUTO"; // width from layoutAlign STRETCH — no fixed width
     f.itemSpacing = gap;
     f.paddingLeft = padH;
     f.paddingRight = padH;
     f.paddingTop = padV;
     f.paddingBottom = padV;
     f.fills = bg ? [{ type: "SOLID", color: bg }] : [];
-    f.layoutAlign = "STRETCH";
-    return f;
+    f.layoutAlign = "STRETCH";        // fills parent's available width
+    return f;                         // no resize() — zero fixed dimensions
   };
 
   const makeText = (content: string, size: number, bold: boolean, color: RGB): TextNode => {
@@ -153,7 +151,7 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
   // Divider
   const divider = figma.createRectangle();
   divider.name = "Divider";
-  divider.resize(INNER_WIDTH, 1);
+  divider.resize(1, 1);
   divider.fills = [{ type: "SOLID", color: C.border }];
   divider.layoutAlign = "STRETCH";
   root.appendChild(divider);
@@ -166,8 +164,7 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
     section.name = label;
     section.layoutMode = "VERTICAL";
     section.primaryAxisSizingMode = "AUTO";
-    section.counterAxisSizingMode = "FIXED";
-    section.resize(INNER_WIDTH, 1);
+    section.counterAxisSizingMode = "AUTO";
     section.fills = [{ type: "SOLID", color: C.panel }];
     section.cornerRadius = 0;
     section.itemSpacing = 0;
@@ -178,8 +175,7 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
     sectionHeader.name = "Label";
     sectionHeader.layoutMode = "VERTICAL";
     sectionHeader.primaryAxisSizingMode = "AUTO";
-    sectionHeader.counterAxisSizingMode = "FIXED";
-    sectionHeader.resize(INNER_WIDTH, 1);
+    sectionHeader.counterAxisSizingMode = "AUTO";
     sectionHeader.fills = [{ type: "SOLID", color, opacity: 0.08 } as SolidPaint];
     sectionHeader.paddingLeft = 14;
     sectionHeader.paddingRight = 14;
@@ -196,9 +192,8 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
       const row = figma.createFrame();
       row.name = `Row ${i + 1}`;
       row.layoutMode = "HORIZONTAL";
-      row.primaryAxisSizingMode = "FIXED";  // width fixed (STRETCH from parent fills it)
+      row.primaryAxisSizingMode = "AUTO";
       row.counterAxisSizingMode = "AUTO";   // height hugs tallest child
-      row.resize(INNER_WIDTH, 1);           // explicit initial width so layoutGrow resolves
       row.fills = [];
       row.itemSpacing = 8;
       row.layoutAlign = "STRETCH";
