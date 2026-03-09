@@ -446,27 +446,15 @@
     errorBanner.style.display = "none";
     badge.style.background = TOKEN.accentBg;
     badge.style.color = TOKEN.accentText;
-    badge.textContent = `${(msg.componentNames || []).length} components found`;
+    badge.textContent = msg.pageName || "Frame selected";
 
     // Prefill screen name
     const nameInput = document.getElementById("screenName");
     nameInput.value = msg.pageName || "";
     nameInput.classList.add("prefilled");
 
-    // Prefill interactions
-    if (msg.interactions && msg.interactions.length > 0) {
-      msg.interactions.forEach((text) => {
-        const row = document.createElement("div");
-        row.className = "field-row";
-        row.innerHTML = `
-          <input type="text" class="prefilled" value="${escapeHtml(text)}" />
-          <button class="remove-btn" onclick="removeRow(this)">✕</button>
-        `;
-        list.appendChild(row);
-      });
-    } else {
-      addRow("interactionList", "e.g. Tap button → triggers action");
-    }
+    // Start interactions blank
+    addRow("interactionList", "e.g. Tap button → triggers action");
   };
 
   function toggleAcc(id) {
