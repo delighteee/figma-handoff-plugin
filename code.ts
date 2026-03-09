@@ -21,21 +21,22 @@ figma.loadFontAsync({ family: "DM Mono", style: "Medium" })
 async function getPageData() {
   const selection = figma.currentPage.selection;
 
-  if (selection.length === 0 || selection[0].type !== "FRAME") {
+  const SUPPORTED = ["FRAME", "COMPONENT", "INSTANCE"] as const;
+  if (selection.length === 0 || !SUPPORTED.includes(selection[0].type as typeof SUPPORTED[number])) {
     figma.ui.postMessage({
       type: "prefill",
       pageName: "",
       interactions: [],
       componentNames: [],
       error: selection.length === 0
-        ? "No frame selected. Please select a frame first."
-        : "Selection is not a frame. Please select a frame.",
+        ? "No selection. Please select a frame or component."
+        : "Please select a frame or component.",
     });
     figma.ui.postMessage({ type: "suggestions", items: [] });
     return;
   }
 
-  const selectedFrame = selection[0] as FrameNode;
+  const selectedFrame = selection[0] as FrameNode | ComponentNode | InstanceNode;
   lastSelectedFrameId = selectedFrame.id;
 
   // findAllWithCriteria is synchronous and internally optimised by Figma —
@@ -57,6 +58,7 @@ async function getPageData() {
     pageName: selectedFrame.name,
     interactions: componentNames.map(name => `Tap ${name} → `),
     componentNames,
+    isComponent: selectedFrame.type === "COMPONENT" || selectedFrame.type === "INSTANCE",
     error: null,
   });
 
@@ -65,7 +67,7 @@ async function getPageData() {
 
 type Issue = { id: string; category: "design" | "a11y" | "ux"; message: string; nodeIds?: string[]; nodeNames?: string[] };
 
-async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
+async function scanForIssues(frame: FrameNode | ComponentNode | InstanceNode): Promise<Issue[]> {
   const issues: Issue[] = [];
   let n = 0;
   const nextId = () => String(n++);
@@ -267,7 +269,7 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
 
   try {
   const sourceNode = lastSelectedFrameId
-    ? (await figma.getNodeByIdAsync(lastSelectedFrameId) as FrameNode | null)
+    ? (await figma.getNodeByIdAsync(lastSelectedFrameId) as FrameNode | ComponentNode | InstanceNode | null)
     : null;
 
   // Fonts are already loading since plugin open — this await is near-instant
@@ -313,8 +315,10 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
     textHi:  { r: 0.929, g: 0.933, b: 0.941 }, // slate-12 #edeef0
   };
 
+  const isComponent = sourceNode?.type === "COMPONENT" || sourceNode?.type === "INSTANCE";
+
   const root = figma.createFrame();
-  root.name = `Handoff – ${msg.screenName || "Screen"}`;
+  root.name = isComponent ? `Component Handoff – ${msg.screenName || "Component"}` : `Handoff – ${msg.screenName || "Screen"}`;
   root.fills = [{ type: "SOLID", color: C.bg }];
   root.cornerRadius = 0;
   root.layoutMode = "VERTICAL";
@@ -339,7 +343,7 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
   header.appendChild(titleText);
   const meta = [msg.screenType, msg.pageSection].filter(Boolean).join("  ·  ");
   if (meta) header.appendChild(makeText(meta, 12, false, C.textLo));
-  header.appendChild(makeText("Developer Handoff", 12, false, C.textLo));
+  header.appendChild(makeText(isComponent ? "Component Handoff" : "Developer Handoff", 12, false, C.textLo));
   root.appendChild(header);
 
   // Divider
@@ -417,7 +421,14 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
     root.appendChild(section);
   };
 
-  const SECTIONS = [
+  // Components get a focused minimal template; screens get the full template.
+  const SECTIONS = isComponent ? [
+    { label: "Props & Variants",           items: msg.componentNotes,                      color: { r: 0.55, g: 0.22, b: 0.95 } },
+    { label: "States to Build",            items: msg.statesToBuild,                       color: { r: 0.9,  g: 0.35, b: 0.1  } },
+    { label: "Assets & Tokens",            items: msg.assets,                              color: { r: 0.7,  g: 0.4,  b: 0.1  } },
+    { label: "Accessibility",              items: msg.accessibility,                       color: { r: 0.15, g: 0.6,  b: 0.45 } },
+    { label: "Additional Info",            items: msg.additionalInfo ? [msg.additionalInfo] : [], color: { r: 0.4, g: 0.4, b: 0.46 } },
+  ] : [
     { label: "API & Data",                items: [...msg.apiCalls, ...msg.dataStates],    color: { r: 0.24, g: 0.43, b: 0.98 } },
     { label: "Interactions & Navigation",  items: [...msg.interactions, ...msg.gestures],  color: { r: 0.06, g: 0.62, b: 0.42 } },
     { label: "Component Notes",            items: msg.componentNotes,                      color: { r: 0.55, g: 0.22, b: 0.95 } },
@@ -425,7 +436,7 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
     { label: "Business Logic",             items: msg.businessLogic,                       color: { r: 0.1,  g: 0.55, b: 0.72 } },
     { label: "Assets & Tokens",            items: msg.assets,                              color: { r: 0.7,  g: 0.4,  b: 0.1  } },
     { label: "Accessibility",              items: msg.accessibility,                       color: { r: 0.15, g: 0.6,  b: 0.45 } },
-    { label: "Analytics",                 items: msg.analytics,                           color: { r: 0.85, g: 0.22, b: 0.45 } },
+    { label: "Analytics",                  items: msg.analytics,                           color: { r: 0.85, g: 0.22, b: 0.45 } },
     { label: "Additional Info",            items: msg.additionalInfo ? [msg.additionalInfo] : [], color: { r: 0.4, g: 0.4, b: 0.46 } },
   ];
 

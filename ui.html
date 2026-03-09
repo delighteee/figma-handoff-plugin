@@ -287,7 +287,7 @@
 <div class="scroll-content">
 
 <h2>🤝 Handoff Template <span class="badge" id="badge">Detecting…</span></h2>
-<p class="subtitle">Select a frame — fields auto-populate from your selection.</p>
+<p class="subtitle">Select a frame or component — fields auto-populate from your selection.</p>
 
 <div class="error-banner" id="errorBanner"></div>
 
@@ -501,6 +501,7 @@
   let currentFrameId = null;
   let saveTimer = null;
 
+
   // ── Persistence helpers ───────────────────────────────────────
   const LIST_CONFIGS = [
     { id: "apiList",           placeholder: "e.g. GET /api/user/:id" },
@@ -648,7 +649,7 @@
 
     if (msg.error) {
       currentFrameId = null;
-      badge.textContent = "⚠ No frame selected";
+      badge.textContent = "⚠ Nothing selected";
       badge.style.background = TOKEN.errorBg;
       badge.style.color = TOKEN.errorText;
       errorBanner.textContent = msg.error;
@@ -661,7 +662,7 @@
     errorBanner.style.display = "none";
     badge.style.background = TOKEN.accentBg;
     badge.style.color = TOKEN.accentText;
-    badge.textContent = msg.pageName || "Frame selected";
+    badge.textContent = msg.pageName || "Selected";
 
     // Reset lists to defaults before potentially overriding with saved state
     document.getElementById("screenName").value = msg.pageName || "";
