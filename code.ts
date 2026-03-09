@@ -76,9 +76,10 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   ]);
 
   const ids = (nodes: { id: string }[], cap = 20) => nodes.slice(0, cap).map(n => n.id);
+  const visible = (n: SceneNode) => n.visible !== false;
 
   // ── Text checks ──────────────────────────────────────────────
-  const textNodes = frame.findAllWithCriteria({ types: ["TEXT"] }) as TextNode[];
+  const textNodes = (frame.findAllWithCriteria({ types: ["TEXT"] }) as TextNode[]).filter(visible);
 
   if (textStyles.length > 0) {
     const unstyled = textNodes.filter(t => !t.textStyleId || t.textStyleId === figma.mixed);
@@ -96,7 +97,7 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
 
   // ── Fill style checks ─────────────────────────────────────────
   if (paintStyles.length > 0) {
-    const fillable = frame.findAllWithCriteria({ types: ["RECTANGLE", "ELLIPSE", "FRAME", "INSTANCE", "COMPONENT"] });
+    const fillable = frame.findAllWithCriteria({ types: ["RECTANGLE", "ELLIPSE", "FRAME", "INSTANCE", "COMPONENT"] }).filter(visible);
     const unstyledFills = fillable.filter(node => {
       const fills = (node as GeometryMixin).fills;
       if (!fills || fills === figma.mixed) return false;
@@ -112,7 +113,7 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   }
 
   // ── Touch target checks ───────────────────────────────────────
-  const instances = frame.findAllWithCriteria({ types: ["INSTANCE"] }) as InstanceNode[];
+  const instances = (frame.findAllWithCriteria({ types: ["INSTANCE"] }) as InstanceNode[]).filter(visible);
   const interactiveKw = ["button", "btn", "tab", "icon", "chip", "toggle", "checkbox", "radio", "fab", "cta"];
   const smallTargets = instances.filter(inst => {
     const name = inst.name.toLowerCase();
@@ -237,7 +238,9 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
     const resolved = (await Promise.all(nodeIds.map(id => figma.getNodeByIdAsync(id))))
       .filter((n): n is SceneNode => n !== null && "visible" in n);
     if (resolved.length > 0) {
-      figma.currentPage.selection = resolved;
+      const existing = figma.currentPage.selection;
+      const existingIds = new Set(existing.map(n => n.id));
+      figma.currentPage.selection = [...existing, ...resolved.filter(n => !existingIds.has(n.id))];
       figma.viewport.scrollAndZoomIntoView(resolved);
     }
     return;
