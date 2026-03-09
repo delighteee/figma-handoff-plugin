@@ -8,6 +8,7 @@ let lastSelectedFrameId: string | null = null;
 const fontPromise = Promise.all([
   figma.loadFontAsync({ family: "Inter", style: "Regular" }),
   figma.loadFontAsync({ family: "Inter", style: "Bold" }),
+  figma.loadFontAsync({ family: "DM Mono", style: "Medium" }),
 ]);
 
 function getPageData() {
@@ -142,7 +143,14 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
 
   // Header
   const header = makeVFrame("Header", 4);
-  header.appendChild(makeText(msg.screenName || "Screen", 26, true, C.textHi));
+  const titleText = figma.createText();
+  titleText.fontName = { family: "DM Mono", style: "Medium" };
+  titleText.fontSize = 26;
+  titleText.fills = [{ type: "SOLID", color: C.textHi }];
+  titleText.characters = msg.screenName || "Screen";
+  titleText.layoutAlign = "STRETCH";
+  titleText.textAutoResize = "HEIGHT";
+  header.appendChild(titleText);
   const meta = [msg.screenType, msg.pageSection].filter(Boolean).join("  ·  ");
   if (meta) header.appendChild(makeText(meta, 12, false, C.textLo));
   header.appendChild(makeText("Developer Handoff", 12, false, C.textLo));
