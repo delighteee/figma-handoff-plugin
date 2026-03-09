@@ -63,7 +63,7 @@ async function getPageData() {
   figma.ui.postMessage({ type: "suggestions", items: await scanForIssues(selectedFrame) });
 }
 
-type Issue = { id: string; category: "design" | "a11y" | "ux"; message: string; nodeIds?: string[] };
+type Issue = { id: string; category: "design" | "a11y" | "ux"; message: string; nodeIds?: string[]; nodeNames?: string[] };
 
 async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   const issues: Issue[] = [];
@@ -75,7 +75,10 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
     figma.getLocalTextStylesAsync(),
   ]);
 
-  const ids = (nodes: { id: string }[], cap = 20) => nodes.slice(0, cap).map(n => n.id);
+  const ref = (nodes: SceneNode[], cap = 20) => ({
+    nodeIds:   nodes.slice(0, cap).map(n => n.id),
+    nodeNames: nodes.slice(0, cap).map(n => n.name),
+  });
   const visible = (n: SceneNode) => n.visible !== false;
 
   // ── Text checks ──────────────────────────────────────────────
@@ -86,14 +89,14 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
     if (unstyled.length > 0)
       issues.push({ id: nextId(), category: "design",
         message: `${unstyled.length} text layer${unstyled.length > 1 ? "s" : ""} not linked to a text style`,
-        nodeIds: ids(unstyled) });
+        ...ref(unstyled) });
   }
 
   const smallText = textNodes.filter(t => typeof t.fontSize === "number" && (t.fontSize as number) < 11);
   if (smallText.length > 0)
     issues.push({ id: nextId(), category: "a11y",
       message: `${smallText.length} text layer${smallText.length > 1 ? "s use" : " uses"} font size < 11px — may be unreadable`,
-      nodeIds: ids(smallText) });
+      ...ref(smallText) });
 
   // ── Fill style checks ─────────────────────────────────────────
   if (paintStyles.length > 0) {
@@ -101,15 +104,15 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
     const unstyledFills = fillable.filter(node => {
       const fills = (node as GeometryMixin).fills;
       if (!fills || fills === figma.mixed) return false;
-      const visible = (fills as ReadonlyArray<Paint>).filter(f => f.visible !== false);
-      if (visible.length === 0) return false;
+      const visibleFills = (fills as ReadonlyArray<Paint>).filter(f => f.visible !== false);
+      if (visibleFills.length === 0) return false;
       const styleId = (node as { fillStyleId?: string | symbol }).fillStyleId;
       return !styleId || styleId === figma.mixed;
     });
     if (unstyledFills.length > 0)
       issues.push({ id: nextId(), category: "design",
         message: `${unstyledFills.length} layer${unstyledFills.length > 1 ? "s use" : " uses"} raw fill colors — not from the style library`,
-        nodeIds: ids(unstyledFills) });
+        ...ref(unstyledFills as SceneNode[]) });
   }
 
   // ── Touch target checks ───────────────────────────────────────
@@ -122,7 +125,7 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   if (smallTargets.length > 0)
     issues.push({ id: nextId(), category: "a11y",
       message: `${smallTargets.length} interactive component${smallTargets.length > 1 ? "s" : ""} may have touch targets below 44pt`,
-      nodeIds: ids(smallTargets) });
+      ...ref(smallTargets) });
 
   // ── UX Heuristics checks ──────────────────────────────────────
 
@@ -134,7 +137,7 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   if (dataInsts.length > 0 && !hasLoadingState)
     issues.push({ id: nextId(), category: "ux",
       message: "Data list/grid present but no loading or skeleton state found — users need feedback while content loads (Nielsen #1)",
-      nodeIds: ids(dataInsts) });
+      ...ref(dataInsts) });
 
   // H3 — User control and freedom: destructive action without confirm/undo
   const destructiveKw = ["delete", "remove", "discard", "clear", "reset"];
@@ -150,7 +153,7 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
     if (!hasConfirmInst && !hasConfirmText)
       issues.push({ id: nextId(), category: "ux",
         message: "Destructive action (delete/remove) detected with no visible confirmation or undo — users need an escape hatch (Nielsen #3)",
-        nodeIds: ids(destructiveInsts) });
+        ...ref(destructiveInsts) });
   }
 
   // H4 — Consistency and standards: multiple primary CTAs
@@ -160,7 +163,7 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   if (primaryCtaInsts.length > 1)
     issues.push({ id: nextId(), category: "ux",
       message: `${primaryCtaInsts.length} primary CTA buttons found — a single dominant action reduces cognitive load (Nielsen #4)`,
-      nodeIds: ids(primaryCtaInsts) });
+      ...ref(primaryCtaInsts) });
 
   // H5 — Error prevention: form inputs with no error state
   const formInputInsts = instances.filter(inst =>
@@ -170,7 +173,7 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   if (formInputInsts.length > 0 && !hasErrorState)
     issues.push({ id: nextId(), category: "ux",
       message: "Form inputs found but no error/validation state components — consider showing inline validation (Nielsen #5)",
-      nodeIds: ids(formInputInsts) });
+      ...ref(formInputInsts) });
 
   // H6 — Recognition rather than recall: icon-only buttons
   const iconOnlyKw = ["icon button", "icon-btn", "icon/button", "fab", "icon only"];
@@ -182,14 +185,14 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   if (unlabelledIcons.length > 0)
     issues.push({ id: nextId(), category: "ux",
       message: `${unlabelledIcons.length} icon-only button${unlabelledIcons.length > 1 ? "s" : ""} with no visible label — consider a tooltip or label (Nielsen #6)`,
-      nodeIds: ids(unlabelledIcons) });
+      ...ref(unlabelledIcons) });
 
   // H8 — Aesthetic and minimalist design: excessive text density
   const denseText = textNodes.filter(t => typeof t.fontSize === "number" && (t.fontSize as number) <= 12);
   if (denseText.length > 20)
     issues.push({ id: nextId(), category: "ux",
       message: `${denseText.length} small text layers (≤12px) — high text density may hurt readability; consider progressive disclosure (Nielsen #8)`,
-      nodeIds: ids(denseText) });
+      ...ref(denseText) });
 
   // H3 — Sub-screen with no back/close navigation
   const frameLower = frame.name.toLowerCase();
@@ -200,7 +203,7 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
     if (!hasExit)
       issues.push({ id: nextId(), category: "ux",
         message: `"${frame.name}" looks like a sub-screen but has no back or close navigation — users need a clear exit (Nielsen #3)`,
-        nodeIds: [frame.id] });
+        nodeIds: [frame.id], nodeNames: [frame.name] });
   }
 
   return issues;
@@ -238,9 +241,6 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
     const resolved = (await Promise.all(nodeIds.map(id => figma.getNodeByIdAsync(id))))
       .filter((n): n is SceneNode => n !== null && "visible" in n);
     if (resolved.length > 0) {
-      const existing = figma.currentPage.selection;
-      const existingIds = new Set(existing.map(n => n.id));
-      figma.currentPage.selection = [...existing, ...resolved.filter(n => !existingIds.has(n.id))];
       figma.viewport.scrollAndZoomIntoView(resolved);
     }
     return;

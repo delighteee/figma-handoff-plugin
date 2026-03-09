@@ -256,6 +256,18 @@
   }
   .suggestion-show:hover { color: var(--blue-10); }
 
+  .suggestion-layers {
+    display: none; flex-basis: 100%; margin-top: 6px;
+    padding: 6px 8px; background: var(--color-surface);
+    border-radius: var(--radius-2); border: 1px solid var(--color-border);
+  }
+  .suggestion-layers.open { display: block; }
+  .suggestion-layer {
+    font-size: 10px; color: var(--color-text-2); padding: 2px 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .suggestion-layer::before { content: "↳ "; color: var(--color-text-3); }
+
   .suggestion-dismiss {
     background: none; border: none; cursor: pointer;
     color: var(--color-text-3); font-size: 15px; padding: 0;
@@ -601,18 +613,26 @@
       msg.items.forEach(item => {
         const el = document.createElement("div");
         el.className = "suggestion-item";
-        if (item.nodeIds && item.nodeIds.length > 0) {
-          el.dataset.nodeIds = JSON.stringify(item.nodeIds);
+        el.style.flexWrap = "wrap";
+        const hasNodes = item.nodeIds && item.nodeIds.length > 0;
+        if (hasNodes) {
+          el.dataset.nodeIds   = JSON.stringify(item.nodeIds);
+          el.dataset.nodeNames = JSON.stringify(item.nodeNames || []);
         }
-        const label = item.category === "a11y" ? "A11Y" : item.category === "ux" ? "UX" : "Design";
-        const showBtn = (item.nodeIds && item.nodeIds.length > 0)
-          ? `<button class="suggestion-show" onclick="showNodes(this)" title="Select in Figma">Show</button>`
+        const label   = item.category === "a11y" ? "A11Y" : item.category === "ux" ? "UX" : "Design";
+        const showBtn = hasNodes
+          ? `<button class="suggestion-show" onclick="showNodes(this)">Show</button>`
+          : "";
+        const layerRows = hasNodes
+          ? (item.nodeNames || item.nodeIds).slice(0, 10)
+              .map(n => `<div class="suggestion-layer">${escapeHtml(String(n))}</div>`).join("")
           : "";
         el.innerHTML = `
           <span class="suggestion-cat ${item.category}">${label}</span>
           <span class="suggestion-msg">${escapeHtml(item.message)}</span>
           ${showBtn}
           <button class="suggestion-dismiss" onclick="dismissSuggestion(this)" title="Dismiss">✕</button>
+          ${hasNodes ? `<div class="suggestion-layers">${layerRows}</div>` : ""}
         `;
         list.appendChild(el);
       });
@@ -665,6 +685,8 @@
   function showNodes(btn) {
     const item = btn.closest(".suggestion-item");
     const nodeIds = JSON.parse(item.dataset.nodeIds || "[]");
+    const layers  = item.querySelector(".suggestion-layers");
+    if (layers) layers.classList.toggle("open");
     if (nodeIds.length > 0) {
       parent.postMessage({ pluginMessage: { type: "show-nodes", nodeIds } }, "*");
     }
