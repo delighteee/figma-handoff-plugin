@@ -131,9 +131,9 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
   root.fills = [{ type: "SOLID", color: C.bg }];
   root.cornerRadius = 0;
   root.layoutMode = "VERTICAL";
-  root.primaryAxisSizingMode = "AUTO";
   root.counterAxisSizingMode = "FIXED";
-  root.resize(FRAME_WIDTH, 1); // width fixed; height hugs via AUTO
+  root.resize(FRAME_WIDTH, 100); // set width; height overridden by AUTO below
+  root.primaryAxisSizingMode = "AUTO"; // must be set AFTER resize() or resize locks height
   root.paddingTop = PADDING;
   root.paddingBottom = PADDING;
   root.paddingLeft = PADDING;
