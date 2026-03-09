@@ -79,10 +79,22 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
     nodeIds:   nodes.slice(0, cap).map(n => n.id),
     nodeNames: nodes.slice(0, cap).map(n => n.name),
   });
-  const visible = (n: SceneNode) => n.visible !== false;
 
+  // Only flag nodes that are directly editable on this frame:
+  // visible, not locked, and not nested inside a component instance
+  // (instance children must be fixed in the main component, not here)
+  const isInsideInstance = (node: SceneNode): boolean => {
+    let p: BaseNode | null = node.parent;
+    while (p !== null && p.id !== frame.id) {
+      if (p.type === "INSTANCE") return true;
+      p = p.parent;
+    }
+    return false;
+  };
+  const editable = (n: SceneNode) =>
+    n.visible !== false && !n.locked && !isInsideInstance(n);
   // ── Text checks ──────────────────────────────────────────────
-  const textNodes = (frame.findAllWithCriteria({ types: ["TEXT"] }) as TextNode[]).filter(visible);
+  const textNodes = (frame.findAllWithCriteria({ types: ["TEXT"] }) as TextNode[]).filter(editable);
 
   if (textStyles.length > 0) {
     const unstyled = textNodes.filter(t => !t.textStyleId || t.textStyleId === figma.mixed);
@@ -100,7 +112,9 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
 
   // ── Fill style checks ─────────────────────────────────────────
   if (paintStyles.length > 0) {
-    const fillable = frame.findAllWithCriteria({ types: ["RECTANGLE", "ELLIPSE", "FRAME", "INSTANCE", "COMPONENT"] }).filter(visible);
+    // Only RECTANGLE and ELLIPSE — FRAME nodes are structural layout containers,
+    // INSTANCE/COMPONENT fills are managed via the component itself
+    const fillable = frame.findAllWithCriteria({ types: ["RECTANGLE", "ELLIPSE"] }).filter(editable);
     const unstyledFills = fillable.filter(node => {
       const fills = (node as GeometryMixin).fills;
       if (!fills || fills === figma.mixed) return false;
@@ -116,7 +130,10 @@ async function scanForIssues(frame: FrameNode): Promise<Issue[]> {
   }
 
   // ── Touch target checks ───────────────────────────────────────
-  const instances = (frame.findAllWithCriteria({ types: ["INSTANCE"] }) as InstanceNode[]).filter(visible);
+  // Instances: filter by visible only (UX/a11y checks are observational,
+  // not about direct editing — a hidden component is simply excluded)
+  const instances = (frame.findAllWithCriteria({ types: ["INSTANCE"] }) as InstanceNode[])
+    .filter(n => n.visible !== false && !n.locked);
   const interactiveKw = ["button", "btn", "tab", "icon", "chip", "toggle", "checkbox", "radio", "fab", "cta"];
   const smallTargets = instances.filter(inst => {
     const name = inst.name.toLowerCase();
