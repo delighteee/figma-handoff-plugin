@@ -4,12 +4,19 @@ figma.showUI(__html__, { width: 480, height: 700 });
 
 let lastSelectedFrameId: string | null = null;
 
-// Pre-load fonts immediately on plugin open — resolves before user clicks the button
+// DM Mono for the header title — falls back to Inter Bold if not available in the file
+let titleFont: FontName = { family: "Inter", style: "Bold" };
+
+// Inter is always available in Figma; load DM Mono separately so its failure
+// never blocks the rest of the plugin or rejects fontPromise.
 const fontPromise = Promise.all([
   figma.loadFontAsync({ family: "Inter", style: "Regular" }),
   figma.loadFontAsync({ family: "Inter", style: "Bold" }),
-  figma.loadFontAsync({ family: "DM Mono", style: "Medium" }),
 ]);
+
+figma.loadFontAsync({ family: "DM Mono", style: "Medium" })
+  .then(() => { titleFont = { family: "DM Mono", style: "Medium" }; })
+  .catch(() => { /* DM Mono unavailable — Inter Bold fallback stays */ });
 
 async function getPageData() {
   const selection = figma.currentPage.selection;
@@ -206,7 +213,7 @@ figma.ui.onmessage = async (msg: HandoffMsg) => {
   // Header
   const header = makeVFrame("Header", 4);
   const titleText = figma.createText();
-  titleText.fontName = { family: "DM Mono", style: "Medium" };
+  titleText.fontName = titleFont;
   titleText.fontSize = 26;
   titleText.fills = [{ type: "SOLID", color: C.textHi }];
   titleText.characters = msg.screenName || "Screen";
