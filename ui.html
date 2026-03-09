@@ -68,12 +68,22 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, sans-serif; }
 
-  body {
-    padding: var(--space-4);
-    padding-bottom: 70px;
+  html, body {
+    height: 100%;
     background: var(--color-bg);
     color: var(--color-text);
     font-size: var(--text-2);
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .scroll-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-4);
   }
 
   h2 { font-size: var(--text-3); font-weight: 700; margin-bottom: 3px; color: var(--color-text); }
@@ -181,7 +191,7 @@
 
   /* ── CTA button ────────────────────────────────────────────── */
   .create-btn {
-    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    flex-shrink: 0;
     width: 100%; padding: 14px 16px;
     background: var(--color-accent);
     color: #fff;
@@ -251,6 +261,8 @@
 </style>
 </head>
 <body>
+
+<div class="scroll-content">
 
 <h2>🤝 Handoff Template <span class="badge" id="badge">Detecting…</span></h2>
 <p class="subtitle">Select a frame — fields auto-populate from your selection.</p>
@@ -450,6 +462,8 @@
     <textarea id="additionalInfo" placeholder="Any extra context for developers…"></textarea>
   </div>
 </div>
+
+</div><!-- /.scroll-content -->
 
 <button class="create-btn" onclick="createHandoff()">Create Handoff Template</button>
 
