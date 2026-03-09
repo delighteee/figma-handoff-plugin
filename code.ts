@@ -46,6 +46,7 @@ async function getPageData() {
 
   figma.ui.postMessage({
     type: "prefill",
+    frameId: selectedFrame.id,
     pageName: selectedFrame.name,
     interactions: componentNames.map(name => `Tap ${name} → `),
     componentNames,

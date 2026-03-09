@@ -462,6 +462,91 @@
     errorText:  '#ff6369',
   };
 
+  let currentFrameId = null;
+  let saveTimer = null;
+
+  // ── Persistence helpers ───────────────────────────────────────
+  const LIST_CONFIGS = [
+    { id: "apiList",           placeholder: "e.g. GET /api/user/:id" },
+    { id: "dataStateList",     placeholder: "e.g. Show skeleton while loading user data" },
+    { id: "interactionList",   placeholder: "e.g. Tap button → triggers action" },
+    { id: "gestureList",       placeholder: "e.g. Swipe left → delete item" },
+    { id: "componentNoteList", placeholder: "e.g. Button/Primary uses disabled state until form valid" },
+    { id: "stateList",         placeholder: "e.g. Authenticated vs guest view" },
+    { id: "logicList",         placeholder: "e.g. Submit disabled until all fields valid" },
+    { id: "assetList",         placeholder: "e.g. Export hero-image@2x as PNG" },
+    { id: "a11yList",          placeholder: 'e.g. Avatar alt text: "User profile photo"' },
+    { id: "analyticsList",     placeholder: "e.g. Track screen_view: profile_screen" },
+  ];
+
+  function getFormState() {
+    return {
+      screenName:     document.getElementById("screenName").value,
+      screenType:     document.getElementById("screenType").value,
+      pageSection:    document.getElementById("pageSection").value,
+      additionalInfo: document.getElementById("additionalInfo").value,
+      apiCalls:       getListValues("apiList"),
+      dataStates:     getListValues("dataStateList"),
+      interactions:   getListValues("interactionList"),
+      gestures:       getListValues("gestureList"),
+      componentNotes: getListValues("componentNoteList"),
+      statesToBuild:  getListValues("stateList"),
+      businessLogic:  getListValues("logicList"),
+      assets:         getListValues("assetList"),
+      accessibility:  getListValues("a11yList"),
+      analytics:      getListValues("analyticsList"),
+    };
+  }
+
+  function setFormState(state) {
+    if (!state) return;
+    if (state.screenName    !== undefined) document.getElementById("screenName").value    = state.screenName;
+    if (state.screenType    !== undefined) document.getElementById("screenType").value    = state.screenType;
+    if (state.pageSection   !== undefined) document.getElementById("pageSection").value   = state.pageSection;
+    if (state.additionalInfo !== undefined) document.getElementById("additionalInfo").value = state.additionalInfo;
+
+    const keyMap = {
+      apiList:           state.apiCalls,
+      dataStateList:     state.dataStates,
+      interactionList:   state.interactions,
+      gestureList:       state.gestures,
+      componentNoteList: state.componentNotes,
+      stateList:         state.statesToBuild,
+      logicList:         state.businessLogic,
+      assetList:         state.assets,
+      a11yList:          state.accessibility,
+      analyticsList:     state.analytics,
+    };
+
+    LIST_CONFIGS.forEach(({ id, placeholder }) => {
+      const values = keyMap[id];
+      if (!values || values.length === 0) return;
+      const list = document.getElementById(id);
+      list.innerHTML = "";
+      values.forEach(v => {
+        const row = document.createElement("div");
+        row.className = "field-row";
+        row.innerHTML = `<input type="text" value="${escapeHtml(v)}" placeholder="${placeholder}" /><button class="remove-btn" onclick="removeRow(this)">✕</button>`;
+        list.appendChild(row);
+      });
+    });
+  }
+
+  function saveNow() {
+    if (!currentFrameId) return;
+    localStorage.setItem("frame_" + currentFrameId, JSON.stringify(getFormState()));
+  }
+
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveNow, 400);
+  }
+
+  // Auto-save on any input/change inside the form
+  document.body.addEventListener("input",  scheduleSave);
+  document.body.addEventListener("change", scheduleSave);
+
+  // ─────────────────────────────────────────────────────────────
   window.onload = () => {
     parent.postMessage({ pluginMessage: { type: "ready" } }, "*");
   };
@@ -493,19 +578,17 @@
 
     if (msg.type !== "prefill") return;
 
-    const badge = document.getElementById("badge");
+    const badge       = document.getElementById("badge");
     const errorBanner = document.getElementById("errorBanner");
-    const list = document.getElementById("interactionList");
-
-    // Reset interactions
-    list.innerHTML = "";
 
     if (msg.error) {
+      currentFrameId = null;
       badge.textContent = "⚠ No frame selected";
       badge.style.background = TOKEN.errorBg;
       badge.style.color = TOKEN.errorText;
       errorBanner.textContent = msg.error;
       errorBanner.style.display = "block";
+      document.getElementById("interactionList").innerHTML = "";
       addRow("interactionList", "e.g. Tap button → triggers action");
       return;
     }
@@ -515,13 +598,23 @@
     badge.style.color = TOKEN.accentText;
     badge.textContent = msg.pageName || "Frame selected";
 
-    // Prefill screen name
-    const nameInput = document.getElementById("screenName");
-    nameInput.value = msg.pageName || "";
-    nameInput.classList.add("prefilled");
+    // Reset lists to defaults before potentially overriding with saved state
+    document.getElementById("screenName").value = msg.pageName || "";
+    document.getElementById("screenType").value = "";
+    document.getElementById("pageSection").value = "";
+    document.getElementById("additionalInfo").value = "";
+    LIST_CONFIGS.forEach(({ id, placeholder }) => {
+      const list = document.getElementById(id);
+      list.innerHTML = "";
+      addRow(id, placeholder);
+    });
 
-    // Start interactions blank
-    addRow("interactionList", "e.g. Tap button → triggers action");
+    // Restore saved state if it exists for this frame
+    currentFrameId = msg.frameId || null;
+    const saved = currentFrameId
+      ? JSON.parse(localStorage.getItem("frame_" + currentFrameId) || "null")
+      : null;
+    if (saved) setFormState(saved);
   };
 
   function dismissSuggestion(btn) {
@@ -566,6 +659,7 @@
   }
 
   function createHandoff() {
+    saveNow(); // persist before plugin closes
     const screenName = document.getElementById("screenName").value.trim();
     if (!screenName) {
       document.getElementById("screenName").focus();
