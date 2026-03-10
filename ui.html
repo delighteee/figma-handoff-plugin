@@ -244,6 +244,7 @@
   .suggestion-cat.design { background: var(--blue-3); color: var(--blue-11); }
   .suggestion-cat.a11y   { background: #2d1b00; color: #ffb224; }
   .suggestion-cat.ux     { background: #0d2d24; color: #30d986; }
+  .suggestion-cat.dark   { background: #2d0d1f; color: #ff6b9d; }
 
   .suggestion-msg { flex: 1; color: var(--color-text-2); }
 
@@ -623,7 +624,7 @@
           el.dataset.nodeIds   = JSON.stringify(item.nodeIds);
           el.dataset.nodeNames = JSON.stringify(item.nodeNames || []);
         }
-        const label   = item.category === "a11y" ? "A11Y" : item.category === "ux" ? "UX" : "Design";
+        const label   = item.category === "a11y" ? "A11Y" : item.category === "ux" ? "UX" : item.category === "dark" ? "Dark Pattern" : "Design";
         const showBtn = hasNodes
           ? `<button class="suggestion-show" onclick="showNodes(this)">Show</button>`
           : "";

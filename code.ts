@@ -66,7 +66,7 @@ async function getPageData() {
   figma.ui.postMessage({ type: "suggestions", items: await scanForIssues(selectedFrame) });
 }
 
-type Issue = { id: string; category: "design" | "a11y" | "ux"; message: string; nodeIds?: string[]; nodeNames?: string[] };
+type Issue = { id: string; category: "design" | "a11y" | "ux" | "dark"; message: string; nodeIds?: string[]; nodeNames?: string[] };
 
 async function scanForIssues(frame: FrameNode | ComponentNode | InstanceNode): Promise<Issue[]> {
   const issues: Issue[] = [];
@@ -213,6 +213,102 @@ async function scanForIssues(frame: FrameNode | ComponentNode | InstanceNode): P
     issues.push({ id: nextId(), category: "ux",
       message: `${denseText.length} small text layers (≤12px) — high text density may hurt readability; consider progressive disclosure (Nielsen #8)`,
       ...ref(denseText) });
+
+  // ── Dark pattern checks ───────────────────────────────────────
+  const getText = (t: TextNode) => typeof t.characters === "string" ? t.characters.toLowerCase() : "";
+
+  // DP1 — Confirmshaming: dismissal copy that guilt-trips the user
+  const confirmshamingKw = [
+    "no thanks", "no, thanks", "i don't want", "i hate ", "no i prefer",
+    "keep me in the dark", "i'll pass", "i don't need", "no, i'm fine",
+    "no thanks, i prefer", "no thanks, i don't",
+  ];
+  const confirmshaming = textNodes.filter(t => confirmshamingKw.some(k => getText(t).includes(k)));
+  if (confirmshaming.length > 0)
+    issues.push({ id: nextId(), category: "dark",
+      message: `Confirmshaming detected — dismissal text uses guilt or shame to pressure users. Replace with neutral language (e.g. "No thanks" not "No thanks, I hate saving money").`,
+      ...ref(confirmshaming) });
+
+  // DP2 — False urgency / fake scarcity
+  const urgencyTextKw = ["only", " left!", "hurry", "limited time", "expires in", "today only", "flash sale", "selling fast", "almost gone", "last chance", "act now", "don't miss"];
+  const urgencyInstKw = ["countdown", "timer", "urgency", "scarcity"];
+  const urgencyText  = textNodes.filter(t => urgencyTextKw.some(k => getText(t).includes(k)));
+  const urgencyInsts = instances.filter(inst => urgencyInstKw.some(k => inst.name.toLowerCase().includes(k)));
+  const allUrgency   = [...urgencyText, ...urgencyInsts] as SceneNode[];
+  if (allUrgency.length > 0)
+    issues.push({ id: nextId(), category: "dark",
+      message: `False urgency / fake scarcity detected — artificial time pressure or low-stock indicators manipulate users into hasty decisions. Only use when genuinely true.`,
+      ...ref(allUrgency) });
+
+  // DP3 — Manipulative social proof ("X people viewing this")
+  const socialProofKw = [
+    "people viewing", "people are looking", "bought in the last", "others are looking",
+    "just purchased", "people have this", "viewing right now", "watching this",
+  ];
+  const socialProof = textNodes.filter(t => socialProofKw.some(k => getText(t).includes(k)));
+  if (socialProof.length > 0)
+    issues.push({ id: nextId(), category: "dark",
+      message: `Manipulative social proof — "X people viewing this now" creates artificial pressure. Ensure these metrics are real; fabricated numbers are deceptive.`,
+      ...ref(socialProof) });
+
+  // DP4 — Trick questions / double-negative opt-outs
+  const trickKw = [
+    "do not unsubscribe", "uncheck to not", "uncheck if you don't", "do not check if",
+    "opt-out by not", "leave unchecked to", "untick to not", "deselect to opt out",
+  ];
+  const trickQuestions = textNodes.filter(t => trickKw.some(k => getText(t).includes(k)));
+  if (trickQuestions.length > 0)
+    issues.push({ id: nextId(), category: "dark",
+      message: `Trick question / double-negative opt-out — confusing phrasing misleads users about consent. Use plain, positive language: "Send me updates" not "Don't uncheck to not receive…".`,
+      ...ref(trickQuestions) });
+
+  // DP5 — Hidden costs / fine print (important fee info in tiny text ≤10px)
+  const finePrintKw = ["terms apply", "fees may apply", "additional charges", "plus tax", "+tax", "conditions apply", "excl.", "excl. tax", "starting from", "from $", "from €", "from £"];
+  const finePrint = textNodes.filter(t =>
+    finePrintKw.some(k => getText(t).includes(k)) &&
+    typeof t.fontSize === "number" && (t.fontSize as number) <= 10);
+  if (finePrint.length > 0)
+    issues.push({ id: nextId(), category: "dark",
+      message: `Hidden costs in fine print — important fee or terms info is in very small text (≤10px). Surface key costs prominently so users can make informed decisions.`,
+      ...ref(finePrint) });
+
+  // DP6 — Misdirection: Skip / Cancel / Decline options in tiny text
+  const misdirectionKw = ["skip", "no thanks", "cancel", "decline", "not now", "maybe later", "remind me later", "dismiss"];
+  const misdirection = textNodes.filter(t =>
+    misdirectionKw.some(k => getText(t).includes(k)) &&
+    typeof t.fontSize === "number" && (t.fontSize as number) <= 11);
+  if (misdirection.length > 0)
+    issues.push({ id: nextId(), category: "dark",
+      message: `Misdirection — "Skip / Cancel / Decline" options are in very small text (≤11px), visually suppressing user escape routes. Give rejection options equal visual weight to confirm actions.`,
+      ...ref(misdirection) });
+
+  // DP7 — Pre-selected opt-ins near marketing/consent copy
+  const preSelectedInsts = instances.filter(inst => {
+    const name = inst.name.toLowerCase();
+    const isCheckOrToggle = name.includes("checkbox") || name.includes("toggle") || name.includes("check/") || name.includes("/check");
+    const appearsChecked  = (name.includes("checked") || name.includes("selected") || name.includes("=on") || name.includes("=true") || name.includes("/on") || name.includes("state=on"))
+                         && !name.includes("unchecked") && !name.includes("uncheck") && !name.includes("=off") && !name.includes("=false");
+    return isCheckOrToggle && appearsChecked;
+  });
+  const hasMarketingText = textNodes.some(t => {
+    const txt = getText(t);
+    return ["newsletter", "marketing", "promotional", "third party", "third-party", "partners", "updates from", "special offers"].some(k => txt.includes(k));
+  });
+  if (preSelectedInsts.length > 0 && hasMarketingText)
+    issues.push({ id: nextId(), category: "dark",
+      message: `Pre-selected marketing opt-in — a checkbox/toggle appears pre-checked near marketing consent text. Opt-in to marketing must require an explicit, active user action.`,
+      ...ref(preSelectedInsts) });
+
+  // DP8 — Roach motel / subscription trap: "cancel anytime" + pricing in tiny text
+  const hasCancelAnytime = textNodes.some(t =>
+    ["cancel anytime", "free trial", "auto-renew", "auto renew", "automatically renews"].some(k => getText(t).includes(k)));
+  const priceNodes = textNodes.filter(t =>
+    ["$", "€", "£", "per month", "/mo", "per year", "/yr", "/month", "/year", "billed"].some(k => getText(t).includes(k)));
+  const smallPriceNodes = priceNodes.filter(t => typeof t.fontSize === "number" && (t.fontSize as number) <= 12);
+  if (hasCancelAnytime && smallPriceNodes.length > 0)
+    issues.push({ id: nextId(), category: "dark",
+      message: `Subscription trap — "Cancel anytime" / "Free trial" present but pricing details are in very small text (≤12px). Make recurring costs and cancellation terms clearly visible before sign-up.`,
+      ...ref(smallPriceNodes) });
 
   // ── Spacing audit (feature 1) ─────────────────────────────────
   // Check auto-layout frames for spacing values not on the 4pt grid
